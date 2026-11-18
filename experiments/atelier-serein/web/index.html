@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#101b17">
+  <title>Atelier Serein · Maison de soins</title>
+  <link rel="stylesheet" href="style.css">
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <a class="skip" href="#prestations">Aller aux soins</a>
+  <header class="header">
+    <a class="wordmark" href="#debut" aria-label="Atelier Serein, accueil">Atelier <i>Serein</i></a>
+    <nav aria-label="Navigation principale">
+      <a href="#maison">La maison</a>
+      <a href="#prestations">Les soins</a>
+    </nav>
+    <button type="button" class="button outline" data-book>Demander un soin</button>
+  </header>
+  <main>
+    <section class="journey" id="debut" aria-label="Découvrir l’atelier">
+      <div class="stage">
+        <div class="scene" aria-hidden="true">
+          <img class="poster" src="frames/000.webp" alt="" width="448" height="672" fetchpriority="high">
+          <canvas width="448" height="672"></canvas>
+        </div>
+        <div class="stage-copy">
+          <div class="chapter" data-chapter="0">
+            <p class="eyebrow">Maison de soins</p>
+            <h1>Atelier<br><i>Serein</i></h1>
+            <p>Un temps réservé à soi.</p>
+          </div>
+          <div class="chapter" data-chapter="1" aria-hidden="true">
+            <p class="eyebrow">L’accueil</p>
+            <p class="chapter-title">Le bruit reste dehors.</p>
+            <p>La lumière guide les premiers pas.</p>
+          </div>
+          <div class="chapter" data-chapter="2" aria-hidden="true">
+            <p class="eyebrow">La salle</p>
+            <p class="chapter-title">Chaque détail prépare le soin.</p>
+            <p>Le lin et la pierre donnent le ton.</p>
+          </div>
+          <div class="chapter" data-chapter="3" aria-hidden="true">
+            <p class="eyebrow">Le rituel</p>
+            <p class="chapter-title">Le soin commence ici.</p>
+            <p>Une huile tiède, choisie avec vous.</p>
+          </div>
+          <a class="stage-link" href="#maison"><span aria-hidden="true"></span> Découvrir la maison</a>
+        </div>
+        <div class="progress" aria-hidden="true"><span></span></div>
+      </div>
+    </section>
+
+    <section class="editorial introduction" id="maison" aria-labelledby="maison-title">
+      <p class="eyebrow">La maison</p>
+      <h2 id="maison-title">Du temps pour <i>ralentir.</i></h2>
+      <p>Atelier Serein est une maison de soins fictive. Chaque rituel commence par un échange, puis s’adapte à ce que vous recherchez, du repos à un massage plus ciblé.</p>
+      <div class="principles">
+        <div><h3>Écouter</h3><p>Parler de vos attentes et choisir l’intensité des gestes.</p></div>
+        <div><h3>Préparer</h3><p>Choisir le soin et l’huile qui vous conviennent.</p></div>
+        <div><h3>Prendre le temps</h3><p>Prolonger le repos de quelques minutes après le soin.</p></div>
+      </div>
+    </section>
+
+    <section class="editorial treatments" id="prestations" aria-labelledby="soins-title">
+      <p class="eyebrow">La carte des soins</p>
+      <h2 id="soins-title">Choisir son <i>rituel.</i></h2>
+      <div class="service-list">
+        <details class="service" open>
+          <summary><span>Rituel du visage</span><span>45 min</span></summary>
+          <p>Un massage du visage, de la nuque et du cuir chevelu à l’huile tiède.</p>
+          <button type="button" class="button outline" data-book="visage">Choisir ce soin</button>
+        </details>
+        <details class="service">
+          <summary><span>Massage à l’huile</span><span>60 min</span></summary>
+          <p>Un massage du corps dont la pression et les zones de travail se décident avec vous.</p>
+          <button type="button" class="button outline" data-book="huile">Choisir ce soin</button>
+        </details>
+        <details class="service">
+          <summary><span>Visage et corps</span><span>90 min</span></summary>
+          <p>Un massage du corps prolongé par le rituel du visage.</p>
+          <button type="button" class="button outline" data-book="complet">Choisir ce soin</button>
+        </details>
+      </div>
+    </section>
+
+    <section class="editorial ritual" aria-labelledby="rituel-title">
+      <div>
+        <img loading="lazy" src="frames/095.webp" width="448" height="672" alt="Vasque en céladon et flacon sur un guéridon en pierre">
+      </div>
+      <div class="ritual-copy">
+        <p class="eyebrow">Le rendez-vous</p>
+        <h2 id="rituel-title">Un soin en <i>trois temps.</i></h2>
+        <ol><li>L’échange et le choix du soin</li><li>Le soin en cabine</li><li>Le retour au calme</li></ol>
+        <button type="button" class="button solid" data-book>Préparer ma demande</button>
+      </div>
+    </section>
+
+    <section class="editorial faq" id="questions" aria-labelledby="faq-title">
+      <p class="eyebrow">Avant le rendez-vous</p>
+      <h2 id="faq-title">Questions <i>fréquentes.</i></h2>
+      <details><summary>Faut-il choisir un soin avant de faire une demande ?</summary><p>Vous pouvez choisir « Je souhaite un conseil » dans le formulaire.</p></details>
+      <details><summary>Comment fonctionne la date souhaitée ?</summary><p>Elle indique une préférence. Cette démonstration ne consulte aucun agenda et ne confirme aucun créneau.</p></details>
+      <details><summary>Que se passe-t-il quand je termine ?</summary><p>Un récapitulatif apparaît dans la fenêtre. La demande reste dans cette page.</p></details>
+    </section>
+  </main>
+
+  <footer>
+    <p class="wordmark">Atelier <i>Serein</i></p>
+    <p>Banc d’essai privé FABRYA · Maison fictive</p>
+    <a href="#debut">Retour au début</a>
+  </footer>
+
+  <dialog id="reservation" aria-labelledby="reservation-title">
+    <div class="dialog-inner">
+      <button type="button" class="close" aria-label="Fermer la réservation">×</button>
+      <p class="eyebrow">Simulation locale</p>
+      <h2 id="reservation-title">Demander un soin</h2>
+      <form>
+        <div class="step" data-step="1">
+          <label for="soin">Soin souhaité</label>
+          <select id="soin" name="soin" required>
+            <option value="">Choisir</option><option value="visage">Rituel du visage · 45 min</option>
+            <option value="huile">Massage à l’huile · 60 min</option>
+            <option value="complet">Visage et corps · 90 min</option>
+            <option value="conseil">Je souhaite un conseil</option>
+          </select>
+          <button type="submit" class="button solid">Continuer</button>
+        </div>
+        <div class="step" data-step="2" hidden>
+          <label for="date">Date souhaitée <span>(facultatif)</span></label>
+          <input type="date" name="date" id="date" aria-describedby="date-note" disabled>
+          <p class="note" id="date-note">Préférence indicative. Aucun créneau n’est vérifié.</p>
+          <div class="form-actions"><button type="button" class="button outline" data-back>Retour</button><button type="submit" class="button solid">Voir le récapitulatif</button></div>
+        </div>
+      </form>
+      <div class="step" data-step="3" hidden>
+        <output id="recap" tabindex="-1"></output>
+        <p class="note">Simulation terminée. Aucune demande envoyée.</p>
+        <div class="form-actions"><button type="button" class="button outline" data-back>Modifier</button><button type="button" class="button solid" data-close>Fermer</button></div>
+      </div>
+    </div>
+  </dialog>
+</body>
+</html>

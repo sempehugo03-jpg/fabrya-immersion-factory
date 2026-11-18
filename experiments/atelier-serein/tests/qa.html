@@ -1,0 +1,85 @@
+<!doctype html><html lang="fr"><meta charset="utf-8"><title>Atelier Serein | Contrôles Chromium</title>
+<style>
+body{margin:0;background:#27332c;color:#f4eadd;font:14px system-ui}
+aside{position:fixed;top:16px;left:16px;width:248px;display:grid;gap:8px}
+button{font:inherit;padding:6px;text-align:left} iframe{margin:0;display:block;position:absolute;top:8px;left:278px;border:0;width:390px;height:844px;background:#101b17}
+pre{white-space:pre-wrap;max-height:240px;overflow:auto;margin:0}
+</style>
+<aside>
+<button data-p="0">Accueil</button><button data-p=".35">Seuil</button><button data-p=".59">Cabine</button><button data-p="1">Détail</button>
+<button data-p=".64">Progression 64 %</button><button data-p=".22">Progression 22 %</button>
+<label for="index">Image</label><input id="index" type="number" min="0" max="95"><button id="next">Image suivante</button><button id="prev">Image précédente</button>
+<button id="metrics">Mesurer la progression</button>
+<button id="desktop">Passer à 1 440 × 900</button><button id="mobile">Passer à 390 × 844</button>
+<button id="editorial">Aller à la maison</button>
+<output id="state">Chargement…</output><pre id="result"></pre>
+</aside><iframe title="Application Atelier Serein" src="./"></iframe>
+<script>
+const frame = document.querySelector('iframe');
+const state = document.querySelector('#state');
+const result = document.querySelector('#result');
+const win = frame.contentWindow;
+const doc = () => frame.contentDocument;
+const track = () => doc().querySelector('.journey').offsetHeight - doc().querySelector('.stage').offsetHeight;
+const stageCanvas = () => doc().querySelector('canvas');
+const actualFrame = () => Number(stageCanvas().dataset.frame ?? 0);
+let requested = 0;
+function seek(value) {
+  requested = Math.max(0, Math.min(95, Math.round(value)));
+  win.scrollTo(0, Math.round(requested / 95 * track()));
+  state.textContent = 'Demandée ' + requested + ' · affichée ' + actualFrame();
+}
+document.querySelectorAll('[data-p]').forEach(button => button.onclick = () => seek(Number(button.dataset.p) * 95));
+document.querySelector('#index').oninput = event => seek(Number(event.target.value));
+document.querySelector('#next').onclick = () => seek(requested + 1);
+document.querySelector('#prev').onclick = () => seek(requested - 1);
+document.querySelector('#editorial').onclick = () => win.scrollTo(0, track() + 665);
+document.querySelector('#desktop').onclick = () => { frame.style.width = '1440px'; frame.style.height = '900px'; seek(0); };
+document.querySelector('#mobile').onclick = () => { frame.style.width = '390px'; frame.style.height = '844px'; seek(0); };
+function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+function animate(destination, duration) {
+  return new Promise(resolve => {
+    const from = win.scrollY;
+    let start;
+    function step(now) {
+      start ??= now;
+      const p = Math.min(1, (now-start)/duration);
+      win.scrollTo(0, from+(destination-from)*p);
+      if (p < 1) requestAnimationFrame(step); else resolve();
+    }
+    requestAnimationFrame(step);
+  });
+}
+frame.addEventListener('load', () => {
+  const canvas = stageCanvas();
+  const observer = new MutationObserver(() => {
+    state.textContent = 'Demandée ' + requested + ' · affichée ' + actualFrame();
+  });
+  observer.observe(canvas, { attributes: true, attributeFilter: ['data-frame'] });
+  state.textContent = 'Demandée 0 · affichée ' + actualFrame();
+});
+document.querySelector('#metrics').onclick = async () => {
+  seek(0);
+  await sleep(850);
+  result.textContent = 'Mesure en cours';
+  const ticks = [];
+  const paints = new Set();
+  const canvas = stageCanvas();
+  const observer = new MutationObserver(() => paints.add(actualFrame()));
+  observer.observe(canvas, { attributes: true, attributeFilter: ['data-frame'] });
+  let previous, running = true;
+  function tick(now) {
+    if (previous !== undefined) ticks.push(now-previous);
+    previous = now;
+    if (running) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+  await animate(track(),5600);
+  running = false;
+  await sleep(250);
+  observer.disconnect();
+  ticks.sort((a,b) => a-b);
+  const resources = win.performance.getEntriesByType('resource').filter(entry => entry.name.endsWith('.webp'));
+  result.textContent = JSON.stringify({ width: win.innerWidth, height: win.innerHeight, medianMs: +ticks[Math.floor(ticks.length*.5)].toFixed(1), p95Ms: +ticks[Math.floor(ticks.length*.95)].toFixed(1), distinctPaintedFrames: paints.size, webpRequests: resources.length, webpTransferBytes: resources.reduce((n,r)=>n+r.transferSize,0), noOverflow:doc().documentElement.scrollWidth<=win.innerWidth },null,2);
+};
+</script></html>
