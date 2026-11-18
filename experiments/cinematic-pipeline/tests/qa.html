@@ -1,0 +1,131 @@
+<!doctype html><html lang="fr"><meta charset="utf-8"><title>Résonance · Mesures Chromium</title>
+<style>body{margin:12px;background:#232925;color:#eee;font:15px system-ui}aside{width:250px;display:grid;gap:7px;position:absolute;left:12px;top:12px}button{padding:8px}iframe{position:absolute;left:280px;top:12px;border:0;background:#111514;width:390px;height:844px}pre{white-space:pre-wrap;overflow-wrap:anywhere}</style>
+<aside>
+<button data-profile="mobile">Viewport mobile</button><button data-profile="desktop">Viewport desktop</button>
+<button data-target="0">Image 0</button><button data-target="48">Image 48</button><button data-target="87">Image 87</button><button data-target="119">Image 119</button>
+<button id="measure">Mesurer A et C</button><output id="state">Chargement</output><pre id="results"></pre>
+</aside>
+<iframe title="Lecteur Résonance" src="./"></iframe>
+<script>
+const frame=document.querySelector('iframe');
+const state=document.querySelector('#state');
+const results=document.querySelector('#results');
+const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+const doc=()=>frame.contentDocument;
+const getScreen=()=>doc().querySelector('#screen');
+const slider=()=>doc().querySelector('#progress');
+function select(index){
+  slider().value=String(index);
+  slider().dispatchEvent(new frame.contentWindow.Event('input',{bubbles:true}));
+}
+function choose(mode){
+  const control=doc().querySelector('input[value="'+mode+'"]');
+  control.click();
+}
+function waitFrame(index, ms=6500){
+  function matches(){
+    const screen=getScreen();
+    const medium=screen.querySelector('video:not([hidden]),canvas:not([hidden])');
+    return screen.dataset.presented===String(index)&&medium?.dataset.ready==='true';
+  }
+  if(matches())return Promise.resolve();
+  return new Promise((resolve,reject)=>{
+    const observer=new MutationObserver(()=>{
+      if(!matches())return;
+      clearTimeout(timeout);observer.disconnect();resolve();
+    });
+    observer.observe(getScreen(),{attributes:true,subtree:true});
+    const timeout=setTimeout(()=>{observer.disconnect();reject(new Error('Image '+index+' non affichée'));},ms);
+  });
+}
+function setProfile(name){
+  frame.style.width=name==='mobile'?'390px':'1080px';
+  frame.style.height=name==='mobile'?'844px':'808px';
+}
+for(const button of document.querySelectorAll('[data-profile]'))button.onclick=()=>setProfile(button.dataset.profile);
+for(const button of document.querySelectorAll('[data-target]'))button.onclick=async()=>{
+  const next=Number(button.dataset.target);
+  select(next);
+  try{await waitFrame(next);state.textContent='Image affichée '+next;}
+  catch(e){state.textContent=e.message;}
+};
+frame.onload=()=>{state.textContent='Lecteur chargé';};
+function stats(values){
+  const sorted=[...values].sort((a,b)=>a-b);
+  return {samples:sorted.length,medianMs:+sorted[Math.floor(sorted.length/2)].toFixed(1),p95Ms:+sorted[Math.floor(sorted.length*.95)].toFixed(1)};
+}
+async function continuousScroll(){
+  select(0);
+  await waitFrame(0);
+  const view=frame.contentWindow;
+  const span=doc().querySelector('.track').offsetHeight-doc().querySelector('.pin').offsetHeight;
+  const observed=new Set();
+  const observer=new MutationObserver(()=>observed.add(Number(getScreen().dataset.presented)));
+  observer.observe(getScreen(),{attributes:true,attributeFilter:['data-presented']});
+  const ticks=[];
+  await new Promise(resolve=>{
+    let start,previous;
+    function step(now){
+      start ??= now;
+      if(previous!==undefined)ticks.push(now-previous);
+      previous=now;
+      const p=Math.min(1,(now-start)/2400);
+      view.scrollTo(0,Math.round(p*span));
+      if(p<1)requestAnimationFrame(step);else resolve();
+    }
+    requestAnimationFrame(step);
+  });
+  await waitFrame(119);
+  observer.disconnect();
+  return {paintStates:observed.size,callbacks:stats(ticks)};
+}
+async function measureMode(mode){
+  const view=frame.contentWindow;
+  const resources=()=>view.performance.getEntriesByType('resource');
+  const before=resources().length;
+  const started=performance.now();
+  choose(mode);
+  await waitFrame(Number(getScreen().dataset.target));
+  const readyMs=+(performance.now()-started).toFixed(1);
+  const latencies=[];
+  const controls=[];
+  let cacheBytes=0;
+  for(const i of [0,48,87,119,87,48,0,79,16,103,0]){
+    const time=performance.now();
+    select(i);
+    await waitFrame(i);
+    controls.push(Number(getScreen().dataset.presented));
+    latencies.push(performance.now()-time);
+    cacheBytes=Math.max(cacheBytes,Number(getScreen().dataset.cacheBytes));
+  }
+  const steadyBefore=Number(getScreen().dataset.presented);
+  await sleep(400);
+  const steadyAfter=Number(getScreen().dataset.presented);
+  for(const i of [3,96,19,119,33,81])select(i);
+  await waitFrame(81);
+  const finalAfterBurst=Number(getScreen().dataset.presented);
+  const scroll=await continuousScroll();
+  const rangeRequests=resources().slice(before).filter(r=>r.name.includes('/media/'));
+  return {
+    readyMs,seek:stats(latencies),scroll,order:controls,steady:steadyBefore===steadyAfter,finalAfterBurst,
+    decodedOwnedUpperSampleBytes:mode==='images'?cacheBytes:null,
+    mediaRequestCount:rangeRequests.length,mediaTransferBytes:rangeRequests.reduce((n,r)=>n+r.transferSize,0),
+  };
+}
+document.querySelector('#measure').onclick=async()=>{
+  results.textContent='Mesures en cours';
+  try {
+    const view=frame.contentWindow;
+    const measurements={viewport:[view.innerWidth,view.innerHeight],userAgent:view.navigator.userAgent};
+    measurements.C=await measureMode('images');
+    measurements.A=await measureMode('video');
+    choose('images');
+    select(87);
+    await waitFrame(87);
+    measurements.hotspotVisible=!doc().querySelector('.hotspot').hidden;
+    measurements.horizontalOverflow=doc().documentElement.scrollWidth>view.innerWidth;
+    measurements.initialPaint=view.performance.getEntriesByType('paint').map(({name,startTime})=>({name,ms:+startTime.toFixed(1)}));
+    results.textContent=JSON.stringify(measurements,null,2);
+  }catch(e){results.textContent=JSON.stringify({error:e.message,actual:getScreen().dataset.presented,target:getScreen().dataset.target});}
+};
+</script></html>

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#101312">
+  <title>Résonance · Plan test FABRYA</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="player.js" type="module"></script>
+</head>
+<body>
+  <a class="skip" href="#controle">Passer au contrôle du plan</a>
+  <main>
+    <section class="track" aria-label="Plan interactif Résonance">
+      <div class="pin">
+        <header><h1>Résonance</h1><span>Plan test FABRYA</span></header>
+        <div class="screen" id="screen" data-presented="0" data-target="0">
+          <picture>
+            <source media="(max-width: 650px)" srcset="media/mobile/000.webp">
+            <img class="poster" src="media/desktop/000.webp" fetchpriority="high" alt="Un atelier de céramique éclairé par une lampe et une fenêtre.">
+          </picture>
+          <video muted playsinline preload="metadata" aria-hidden="true" hidden></video>
+          <canvas aria-hidden="true" hidden></canvas>
+          <button type="button" class="hotspot" aria-haspopup="dialog" aria-label="Examiner la céramique émaillée" hidden><span aria-hidden="true"></span></button>
+          <p class="error" aria-live="polite" hidden></p>
+        </div>
+        <section id="controle" aria-label="Contrôles du plan">
+          <div class="position">
+            <label for="progress">Position</label>
+            <input id="progress" type="range" min="0" max="119" value="0" step="1">
+            <output for="progress" id="position">0 %</output>
+          </div>
+          <div class="controls">
+            <p id="instruction">Défilez dans les deux sens ou déplacez le curseur.</p>
+            <fieldset>
+              <legend class="sr">Méthode de lecture</legend>
+              <label><input name="mode" type="radio" value="video"> <span>A · Vidéo</span></label>
+              <label><input name="mode" type="radio" value="images" checked> <span>C · Images + action</span></label>
+            </fieldset>
+          </div>
+        </section>
+      </div>
+    </section>
+    <footer><a href="#controle">Revenir au contrôle du plan</a></footer>
+  </main>
+  <dialog id="detail" aria-labelledby="detail-title">
+    <div class="dialog-head"><h2 id="detail-title">Céramique émaillée</h2><button type="button" class="close" aria-label="Fermer la fiche">×</button></div>
+    <p>Un émail sombre laisse apparaître un réseau de craquelures fines. La lumière rasante de la fenêtre révèle le relief de la surface.</p>
+    <p>Échantillon fictif de l’atelier Résonance.</p>
+  </dialog>
+</body>
+</html>
