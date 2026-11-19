@@ -85,7 +85,24 @@ def main(args):
     context = {"brief": args.brief.read_text(), "concept": opt["concept"], "vision": opt["vision"]}
     media_file = args.website / "media.html"
     if args.phase == "media":
-        media_file.write_text(generate(args, "media", MEDIA, context))
+        instructions = MEDIA
+        if args.repair_previous:
+            previous = args.repair_previous.read_text()
+            old_protocol = Protocol()
+            old_protocol.feed(previous)
+            context["contrat_existant"] = json.loads(old_protocol.text)
+            context["defauts_constates"] = [
+                "En mode quartz la toile affiche du texte seul; en mode mécanique elle prévoit un cercle seul.",
+                "Object.assign écrit dans un objet temporaire. Le dessin lit ensuite les variables inchangées.",
+                "Le préfixe # devant un nom de couleur ne produit pas une couleur CSS valide.",
+            ]
+            instructions += (
+                "\nReprends le contrat déjà décidé par FABRYA, à l'identique, pour que le site utilise les mêmes commandes."
+                " Corrige les défauts concrets et réalise un vrai média détaillé, fidèle aux matières et à l'objet de ta vision."
+                " Chaque clé et chaque valeur du contrat doit déclencher un changement de la représentation."
+                " Valide la continuité entre état, dessin et messages avant de terminer. Tes décisions de réalisation restent libres."
+            )
+        media_file.write_text(generate(args, "media", instructions, context))
     parser = Protocol()
     parser.feed(media_file.read_text())
     protocol = json.loads(parser.text)
@@ -105,6 +122,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("exploration", "brief", "evidence", "website"):
         parser.add_argument(f"--{name}", type=Path, required=True)
+    parser.add_argument("--repair-previous", type=Path)
     parser.add_argument("--phase", choices=("media", "assembly"), required=True)
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--model", required=True)
