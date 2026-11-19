@@ -4,7 +4,11 @@
  * escapement close-up, finishes, dial selection, appointment.
  */
 import * as THREE from './vendor/three.module.min.js';
-import { RoomEnvironment } from './vendor/RoomEnvironment.js';
+import { EffectComposer } from './vendor/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from './vendor/addons/postprocessing/RenderPass.js';
+import { BokehPass } from './vendor/addons/postprocessing/BokehPass.js';
+import { UnrealBloomPass } from './vendor/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from './vendor/addons/postprocessing/OutputPass.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -145,7 +149,7 @@ const canvas = $('#scene');
 const loader = $('.loader');
 let renderer = null;
 try {
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
 } catch (err) {
   renderer = null;
 }
@@ -162,18 +166,49 @@ if (!renderer) {
 function buildStage(renderer) {
   renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.92;
-  renderer.setClearColor(0x000000, 0);
+  renderer.toneMapping = THREE.NeutralToneMapping;
+  renderer.toneMappingExposure = 1.0;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   const scene = new THREE.Scene();
   const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.035).texture;
-  scene.environmentIntensity = 0.9;
+  // photo studio: black room, softboxes and strip lights, so polished steel reads as it does in a product shot
+  function studioEnvironment() {
+    const env = new THREE.Scene();
+    env.background = new THREE.Color(0x010203);
+    const panel = (w, h, x, y, z, intensity, color = 0xffffff) => {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(intensity), side: THREE.DoubleSide }));
+      m.position.set(x, y, z); m.lookAt(0, 0, 0); env.add(m);
+    };
+    panel(34, 12, 0, 30, 16, 5.5);               // overhead softbox
+    panel(3.5, 36, -27, 4, 12, 9);               // left strip
+    panel(3.5, 36, 27, 2, 8, 6.5, 0xffeed6);     // right strip, warm
+    panel(46, 2.2, 0, -16, 24, 3.2);             // low strip: the bright line across the dial
+    panel(10, 34, 10, 6, -30, 4.5, 0xc9dcff);    // cool rim from behind
+    panel(70, 26, 0, 4, 46, 0.35, 0xdfe6f5);     // faint front bounce
+    panel(14, 14, -18, -24, -10, 1.6, 0xffd9a8); // warm kicker low left
+    return env;
+  }
+  scene.environment = pmrem.fromScene(studioEnvironment(), 0.015).texture;
+  scene.environmentIntensity = 1.0;
+  {
+    const c = document.createElement('canvas'); c.width = 64; c.height = 1024;
+    const g2 = c.getContext('2d');
+    const lg = g2.createLinearGradient(0, 0, 0, 1024);
+    lg.addColorStop(0, '#0d1528'); lg.addColorStop(0.55, '#0a1020'); lg.addColorStop(1, '#05080f');
+    g2.fillStyle = lg; g2.fillRect(0, 0, 64, 1024);
+    const bg = new THREE.CanvasTexture(c); bg.colorSpace = THREE.SRGBColorSpace;
+    scene.background = bg;
+  }
 
-  const camera = new THREE.PerspectiveCamera(26, 1, 1, 2000);
+  const camera = new THREE.PerspectiveCamera(26, 1, 8, 900);
 
-  const key = new THREE.DirectionalLight(0xffe6c2, 2.4); key.position.set(40, 50, 70); scene.add(key);
+  const key = new THREE.DirectionalLight(0xffe6c2, 2.6); key.position.set(40, 50, 70); scene.add(key);
+  key.castShadow = true;
+  key.shadow.mapSize.set(3072, 3072);
+  Object.assign(key.shadow.camera, { left: -52, right: 52, top: 52, bottom: -52, near: 10, far: 260 });
+  key.shadow.bias = -0.0004; key.shadow.normalBias = 0.04; key.shadow.radius = 4;
   const rim = new THREE.DirectionalLight(0x8fb0ff, 1.6); rim.position.set(-60, -20, -40); scene.add(rim);
   const fillL = new THREE.DirectionalLight(0xffffff, 0.5); fillL.position.set(-30, 40, 30); scene.add(fillL);
 
@@ -361,6 +396,28 @@ function buildStage(renderer) {
   let currentDial = 'nuit';
   const dialTex = canvasTexture(2048, (ctx, s) => drawDial(ctx, s, DIALS[currentDial]));
 
+  const grainTex = canvasTexture(512, (ctx, s) => {
+    const img = ctx.createImageData(s, s);
+    for (let i = 0; i < s * s; i++) {
+      const x = i % s, y = (i / s) | 0;
+      const cell = Math.sin(x * 0.31 + Math.sin(y * 0.13) * 3) * Math.sin(y * 0.29 + Math.sin(x * 0.11) * 3);
+      const v = 150 + cell * 40 + (Math.random() - 0.5) * 70;
+      img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = v; img.data[i * 4 + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+  }, { linear: true });
+  grainTex.wrapS = grainTex.wrapT = THREE.RepeatWrapping; grainTex.repeat.set(3, 4);
+
+  // sunburst: brushing direction runs radially from the centre (tangent-space vectors)
+  const sunAniso = canvasTexture(512, (ctx, s) => {
+    const img = ctx.createImageData(s, s), c = s / 2;
+    for (let y = 0; y < s; y++) for (let x = 0; x < s; x++) {
+      const dx = x - c + 0.5, dy = -(y - c + 0.5), l = Math.hypot(dx, dy) || 1, i = (y * s + x) * 4;
+      img.data[i] = (dx / l * 0.5 + 0.5) * 255; img.data[i + 1] = (dy / l * 0.5 + 0.5) * 255; img.data[i + 2] = 255; img.data[i + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+  }, { linear: true });
+
   /* ---------------- materials ---------------- */
   const M = {
     steel: new THREE.MeshPhysicalMaterial({ color: 0xe2e5ea, metalness: 1, roughness: 0.14 }),
@@ -369,16 +426,16 @@ function buildStage(renderer) {
     gilt: new THREE.MeshPhysicalMaterial({ color: 0xd8b26a, metalness: 1, roughness: 0.3 }),
     blued: new THREE.MeshPhysicalMaterial({ color: 0x2c55c4, metalness: 0.85, roughness: 0.22, clearcoat: 0.8, clearcoatRoughness: 0.1 }),
     ruby: new THREE.MeshPhysicalMaterial({ color: 0xb0102e, metalness: 0, roughness: 0.04, clearcoat: 1, emissive: 0x2a0008 }),
-    glass: new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 0, roughness: 0, transparent: true, opacity: 0.12, clearcoat: 1, depthWrite: false, envMapIntensity: 2.2 }),
-    backGlass: new THREE.MeshPhysicalMaterial({ color: 0xbcd0ff, metalness: 0, roughness: 0.02, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide }),
-    bridge: new THREE.MeshPhysicalMaterial({ color: 0xffffff, map: cotesTex, metalness: 1, roughness: 0.26 }),
-    plate: new THREE.MeshPhysicalMaterial({ color: 0xc4c9d0, map: perlageTex, metalness: 1, roughness: 0.34 }),
+    glass: new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 0, roughness: 0.0, transmission: 1, thickness: 1.4, ior: 1.77, specularIntensity: 1, attenuationColor: 0xe8f0ff, attenuationDistance: 40 }),
+    backGlass: new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 0, roughness: 0.02, transmission: 1, thickness: 0.5, ior: 1.77 }),
+    bridge: new THREE.MeshPhysicalMaterial({ color: 0xffffff, map: cotesTex, bumpMap: cotesTex, bumpScale: 0.6, metalness: 1, roughness: 0.22, anisotropy: 0.6, anisotropyRotation: Math.PI / 2 - 0.62 }),
+    plate: new THREE.MeshPhysicalMaterial({ color: 0xc4c9d0, map: perlageTex, bumpMap: perlageTex, bumpScale: 0.5, metalness: 1, roughness: 0.3 }),
     ratchet: new THREE.MeshPhysicalMaterial({ color: 0xffffff, map: sunburstSteelTex, metalness: 1, roughness: 0.18 }),
-    leather: new THREE.MeshPhysicalMaterial({ color: 0x1c1511, roughness: 0.62, metalness: 0, sheen: 1, sheenColor: 0x6e4c34, sheenRoughness: 0.5, clearcoat: 0.15, side: THREE.DoubleSide }),
+    leather: new THREE.MeshPhysicalMaterial({ color: 0x2a1910, bumpMap: grainTex, bumpScale: 2.5, roughnessMap: grainTex, roughness: 0.75, metalness: 0, sheen: 1, sheenColor: 0x6e4c34, sheenRoughness: 0.5, clearcoat: 0.15, side: THREE.DoubleSide }),
     stitch: new THREE.MeshStandardMaterial({ color: 0xd8c7a4, roughness: 0.8 }),
     hair: new THREE.MeshPhysicalMaterial({ color: 0xa9bde2, metalness: 1, roughness: 0.2 }),
     dark: new THREE.MeshStandardMaterial({ color: 0x0a0d14, metalness: 0.2, roughness: 0.6 }),
-    dial: new THREE.MeshPhysicalMaterial({ map: dialTex, metalness: 0.55, roughness: 0.3, clearcoat: 0.4 }),
+    dial: new THREE.MeshPhysicalMaterial({ map: dialTex, metalness: 0.55, roughness: 0.3, clearcoat: 0.4, anisotropy: 0.9, anisotropyMap: sunAniso }),
     ring: new THREE.MeshPhysicalMaterial({ color: 0x0d1a38, metalness: 0.4, roughness: 0.4 }),
     trim: new THREE.MeshPhysicalMaterial({ color: 0xe8c78c, metalness: 1, roughness: 0.16 }),
     hand: new THREE.MeshPhysicalMaterial({ color: 0xe8c78c, metalness: 1, roughness: 0.14 }),
@@ -480,7 +537,7 @@ function buildStage(renderer) {
   }
 
   function strapGeometry(curve, segs, w0, w1, th) {
-    const pos = [], index = [];
+    const pos = [], index = [], uv = [];
     for (let i = 0; i <= segs; i++) {
       const tt = i / segs;
       const p = curve.getPoint(tt), tan = curve.getTangent(tt);
@@ -488,7 +545,7 @@ function buildStage(renderer) {
       const w = lerp(w0, w1, tt) / 2, r = Math.min(0.7, th / 2);
       // rounded-edge rectangle cross-section, 10 points
       const ring = [[-w + r, 1], [w - r, 1], [w, 0.55], [w, -0.55], [w - r, -1], [-w + r, -1], [-w, -0.55], [-w, 0.55]];
-      for (const [x, k] of ring) pos.push(x, p.y + n.y * k * th / 2, p.z + n.z * k * th / 2);
+      ring.forEach(([x, k], j) => { pos.push(x, p.y + n.y * k * th / 2, p.z + n.z * k * th / 2); uv.push(x / 20 + 0.5, tt * 2.2); });
     }
     const R = 8;
     for (let i = 0; i < segs; i++) {
@@ -499,9 +556,25 @@ function buildStage(renderer) {
     }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     g.setIndex(index);
     g.computeVertexNormals();
     return g;
+  }
+
+  function facets(tris) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(tris.flat(2), 3));
+    g.computeVertexNormals();
+    return g;
+  }
+  // applied index: a bar with a polished roof ridge (half width w, half length l)
+  function roofBar(w, l, h0, h) {
+    const a = [-w, -l, 0], b = [w, -l, 0], c = [w, l, 0], d = [-w, l, 0];
+    const A = [-w, -l, h0], B = [w, -l, h0], C = [w, l, h0], D = [-w, l, h0];
+    const R1 = [0, -l, h], R2 = [0, l, h];
+    const q = (p1, p2, p3, p4) => [[p1, p2, p3], [p1, p3, p4]];
+    return facets([...q(B, C, R2, R1), ...q(D, A, R1, R2), [A, B, R1], [C, D, R2], ...q(a, b, B, A), ...q(b, c, C, B), ...q(c, d, D, C), ...q(d, a, A, D)]);
   }
 
   function polyShape(points) {
@@ -703,9 +776,7 @@ function buildStage(renderer) {
   const rehaut = mesh(lathe([[R_DIAL, 0.6], [17.95, 3.6], [17.95, 3.7], [R_DIAL - 0.05, 0.62]], 160), M.ring, G.dial);
   rehaut.renderOrder = 1;
   {
-    const idx = new THREE.Shape();
-    idx.moveTo(-0.32, -1.25); idx.lineTo(0.32, -1.25); idx.lineTo(0.32, 1.25); idx.lineTo(-0.32, 1.25); idx.closePath();
-    const ig = ext(idx, 0.18, 0.12, 2, 4);
+    const ig = roofBar(0.36, 1.3, 0.2, 0.42);
     for (let h = 0; h < 12; h++) {
       const a = Math.PI / 2 - (h / 12) * TAU;
       const r = 13.9;
@@ -724,9 +795,10 @@ function buildStage(renderer) {
 
   // --- hands (dauphine, faceted by bevel)
   function dauphine(len, w, tail) {
-    const s = new THREE.Shape();
-    s.moveTo(0, -tail); s.lineTo(w, 0); s.lineTo(0, len); s.lineTo(-w, 0); s.closePath();
-    return ext(s, 0.06, 0.08, 2, 4);
+    // four facets meeting on a raised spine, like a hand-polished dauphine
+    const h = w * 0.55;
+    const T = [0, -tail, h * 0.5], L = [-w, 0, 0], P = [0, len, h * 0.15], Rr = [w, 0, 0], C = [0, 0, h];
+    return facets([[T, C, L], [L, C, P], [T, Rr, C], [C, Rr, P], [T, L, P], [T, P, Rr]]);
   }
   const hourHand = new THREE.Group(); hourHand.position.z = 1.2; G.hands.add(hourHand);
   mesh(dauphine(9.6, 0.62, 1.8), M.hand, hourHand);
@@ -767,6 +839,7 @@ function buildStage(renderer) {
     const v = DIALS[key];
     dialTex.userData.redraw((ctx, s) => drawDial(ctx, s, v));
     M.dial.metalness = v.metal; M.dial.roughness = v.rough; M.dial.clearcoat = v.coat;
+    M.dial.anisotropy = v.pattern === 'sunburst' ? 0.9 : v.pattern === 'guilloche' ? 0.35 : 0;
     M.ring.color.setHex(v.ring);
     applyTrim(M.trim, v.trim);
     applyTrim(M.hand, v.trim);
@@ -789,21 +862,43 @@ function buildStage(renderer) {
      (fraction of the viewport; d = desktop, m = phone), e: exploded view,
      e2: upper layers slid aside to reveal the movement. */
   const K = [
-    { rot: [0.0, 0.0, 0.0], look: [0, 0, 0], dist: 158, d: [0.2, 0], m: [0, 0.21], e: 0, e2: 0 },
-    { rot: [-0.32, -1.08, 0.08], look: [6, 0, 0], dist: 112, d: [0.21, 0], m: [0, 0.21], e: 0, e2: 0 },
-    { rot: [-0.98, -0.6, 0.45], look: [0, 0, -1], dist: 250, d: [0.17, 0], m: [-0.04, 0.19], e: 1, e2: 0 },
-    { rot: [-0.18, 0.22, 0.05], look: [-7.6, -6.4, -2], dist: 78, d: [0.21, 0], m: [0, 0.21], e: 1, e2: 1 },
-    { rot: [-0.62, 0.42, 0.3], look: [3, 1, -2], dist: 98, d: [0.25, 0], m: [0, 0.21], e: 0.3, e2: 1 },
-    { rot: [0.0, 0.0, 0.0], look: [0, 0, 0], dist: 150, d: [0.2, 0], m: [0, 0.21], e: 0, e2: 0 },
-    { rot: [0.18, 0.55, -0.12], look: [0, 0, 0], dist: 165, d: [-0.22, 0], m: [0, 0.24], e: 0, e2: 0 },
+    { rot: [0.0, 0.0, 0.0], look: [0, 0, 0], dist: 158, d: [0.2, 0], m: [0, 0.21], e: 0, e2: 0, dof: 0.00002 },
+    { rot: [-0.32, -1.08, 0.08], look: [6, 0, 0], dist: 112, d: [0.21, 0], m: [0, 0.21], e: 0, e2: 0, dof: 0.00022 },
+    { rot: [-0.98, -0.6, 0.45], look: [0, 0, -1], dist: 250, d: [0.17, 0], m: [-0.04, 0.19], e: 1, e2: 0, dof: 0.00008 },
+    { rot: [-0.18, 0.22, 0.05], look: [-7.6, -6.4, -2], dist: 78, d: [0.21, 0], m: [0, 0.21], e: 1, e2: 1, dof: 0.00045 },
+    { rot: [-0.62, 0.42, 0.3], look: [3, 1, -2], dist: 98, d: [0.25, 0], m: [0, 0.21], e: 0.3, e2: 1, dof: 0.00028 },
+    { rot: [0.0, 0.0, 0.0], look: [0, 0, 0], dist: 150, d: [0.2, 0], m: [0, 0.21], e: 0, e2: 0, dof: 0.00002 },
+    { rot: [0.18, 0.55, -0.12], look: [0, 0, 0], dist: 165, d: [-0.22, 0], m: [0, 0.24], e: 0, e2: 0, dof: 0.0001 },
   ];
+
+  /* ---------------- shadows ---------------- */
+  watch.traverse((o) => {
+    if (!o.isMesh) return;
+    const glassy = o.material === M.glass || o.material === M.backGlass;
+    o.castShadow = !glassy && !o.isInstancedMesh;
+    o.receiveShadow = !glassy;
+  });
+
+  /* ---------------- lens: MSAA, depth of field, bloom ---------------- */
+  const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
+  const composer = new EffectComposer(renderer, rt);
+  composer.addPass(new RenderPass(scene, camera));
+  const bokeh = new BokehPass(scene, camera, { focus: 150, aperture: 0.0002, maxblur: 0.009 });
+  composer.addPass(bokeh);
+  const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.18, 0.5, 0.96);
+  composer.addPass(bloom);
+  composer.addPass(new OutputPass());
 
   /* ---------------- interaction state ---------------- */
   let W = 1, H = 1, mobile = false;
   function resize() {
     W = innerWidth; H = innerHeight;
     mobile = mobileMQ.matches;
+    const pr = Math.min(devicePixelRatio || 1, 2);
+    renderer.setPixelRatio(pr);
     renderer.setSize(W, H, false);
+    composer.setPixelRatio(pr);
+    composer.setSize(W, H);
     camera.aspect = W / H;
     camera.updateProjectionMatrix();
   }
@@ -935,7 +1030,9 @@ function buildStage(renderer) {
       }
     }
 
-    renderer.render(scene, camera);
+    bokeh.uniforms.focus.value = dist;
+    bokeh.uniforms.aperture.value = lerp(a.dof, b.dof, f) * (mobile ? 0.6 : 1);
+    composer.render(dt);
     if (first) { first = false; loader.classList.add('done'); }
   }
   requestAnimationFrame(frame);
