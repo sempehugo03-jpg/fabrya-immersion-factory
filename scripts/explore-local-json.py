@@ -38,7 +38,11 @@ def unique_fields(pairs):
 def local_json_speaker(url, model):
     def speak(run, stage, instructions, schema, content):
         checkpoint = os.environ.get("FABRYA_REUSE_EXPLORATION")
-        if checkpoint and stage in {"unrestricted_exploration", "artistic_selection", "unrestricted_exploration_divergence"}:
+        frozen_stages = {
+            "unrestricted_exploration", "artistic_selection", "unrestricted_exploration_divergence",
+            "artistic_selection_divergence", "unrestricted_realization",
+        }
+        if checkpoint and stage in frozen_stages:
             original = Path(checkpoint)
             request_name = f"{stage}-request.json"
             if (original / request_name).read_bytes() != (run.directory / request_name).read_bytes():
@@ -52,6 +56,16 @@ def local_json_speaker(url, model):
             if choice["finish_reason"] != "stop":
                 raise Rejected("Preserved stage was incomplete")
             output = json.loads(choice["message"]["content"], object_pairs_hook=unique_fields)
+            if stage == "artistic_selection_divergence":
+                groups = {}
+                for member, data in output.pop("assignments").items():
+                    group = groups.setdefault(data["group"].strip(), {"members": [], "evidence": []})
+                    group["members"].append(member)
+                    group["evidence"].append(data["evidence"].strip())
+                output["groups"] = [
+                    {"members": group["members"], "evidence": " ".join(group["evidence"])}
+                    for group in groups.values()
+                ]
             validate(schema, output)
             if output != json.loads((original / f"{stage}.json").read_text()):
                 raise Rejected("Preserved stage differs from its validated checkpoint")
@@ -60,7 +74,38 @@ def local_json_speaker(url, model):
             run.record("model_inference", "replayed_verified_response", phase=stage, model=model,
                        response_sha256=hashlib.sha256(raw).hexdigest(), charged_microusd=0)
             print(f"{stage}: verified checkpoint", flush=True)
+            if stage == "unrestricted_realization":
+                write_json(run.directory / "realisation-originale-avant-controle-factuel.json", output)
+                correction_schema = {
+                    "type": "object",
+                    "properties": {"confirmed_facts": {"type": "array", "maxItems": 1,
+                        "items": {"type": "string", "enum": ["horloger"]}},
+                        "reason": {"type": "string"}},
+                    "required": ["confirmed_facts", "reason"], "additionalProperties": False,
+                }
+                correction_instructions = (
+                    "Tu es FABRYA, auteur de cette vision. Le site demandé est une démonstration fictive. "
+                    "Corrige uniquement le statut des affirmations présentées comme faits réels. "
+                    "Les faits confirmés sont les citations littérales du brief qui décrivent réellement l'activité. "
+                    "Préserve ta fiction, ta mise en scène, tes interactions et tes décisions. "
+                    "Explique pourquoi les éléments retirés ne sont pas établis."
+                )
+                correction = speak(run, "factual_classification", correction_instructions, correction_schema,
+                                   [{"type": "input_text", "text": json.dumps({
+                                       "brief": json.loads(content[0]["text"])["brief"],
+                                       "vision": output,
+                                       "critique": json.loads((original / "unrestricted_critique.json").read_text()),
+                                   }, ensure_ascii=False)}])
+                write_json(run.directory / "factual_classification.json", correction)
+                output = {**output, "confirmed_facts": correction["confirmed_facts"]}
             return output
+        if stage == "unrestricted_critique":
+            instructions += (
+                "\nRègle factuelle de cette démonstration fictive. Exige une preuve pour une assertion "
+                "présentée comme un fait réel et cite ce passage dans unsupported_client_claims. "
+                "Les éléments déclarés fictifs et les informations demandées sous client_evidence_needed "
+                "ne constituent pas des assertions réelles. Leur présence seule ne justifie pas ce champ."
+            )
         stage_request = {
             "model": model, "stream": False, "temperature": .32, "seed": 19,
             "max_tokens": 1800,
