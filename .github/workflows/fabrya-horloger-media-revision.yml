@@ -1,0 +1,54 @@
+name: FABRYA — Correction du média horloger
+on:
+  push:
+    branches:
+      - experiment/carte-blanche-horloger
+    paths:
+      - .github/workflows/fabrya-horloger-media-revision.yml
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Render the preserved vision
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p run/exploration
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          seed=json.loads(Path("experiments/carte-blanche-horloger/decision.json").read_text())
+          Path("run/brief.txt").write_text(seed.pop("brief"))
+          for name, data in seed.items():
+              (Path("run/exploration")/name).write_text(json.dumps(data,ensure_ascii=False,indent=2)+"\n")
+          PY
+          curl -fsSL --retry 2 -o "$RUNNER_TEMP/llama.tar.gz" https://github.com/ggml-org/llama.cpp/releases/download/b12532/llama-b12532-bin-ubuntu-x64.tar.gz
+          tar -xzf "$RUNNER_TEMP/llama.tar.gz" -C "$RUNNER_TEMP"
+          curl -fsSL --retry 2 -o "$RUNNER_TEMP/model.gguf" https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/3885219b6810b007914f3a7950a8d1b469d598a5/Qwen3.5-9B-Q4_K_M.gguf
+          server=$(find "$RUNNER_TEMP" -name llama-server -type f -print -quit)
+          nohup "$server" -m "$RUNNER_TEMP/model.gguf" --alias fabrya-qwen35-9b --host 127.0.0.1 --port 18228 -c 12288 -t 4 -tb 4 -np 1 --reasoning off --no-warmup > run/llama.log 2>&1 </dev/null &
+          for attempt in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:18228/health >/dev/null; then break; fi
+            sleep 2
+          done
+          python3 scripts/make-exploration-media.py --exploration run/exploration --brief run/brief.txt --evidence run/production --website run/website --port 18228 --model fabrya-qwen35-9b --phase media --repair-previous experiments/carte-blanche-horloger/media-draft.html
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: horloger-media
+          path: run/
+          retention-days: 1
+      - name: Verify the actual media state changes
+        run: |
+          npm install --no-save playwright@1.58.0
+          FABRYA_BROWSER_PATH="$(command -v google-chrome)" node scripts/verify-exploration-media.cjs run/website/media.html run/media-browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: horloger-media-verifie
+          path: run/
+          retention-days: 1
