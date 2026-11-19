@@ -1,5 +1,6 @@
 const { chromium } = require(process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES ? process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES + '/playwright' : 'playwright');
 const fs = require('node:fs/promises');
+const { createHash } = require('node:crypto');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 
@@ -69,6 +70,18 @@ async function inspect(browser, name, config) {
     }
     steps.apres_molette_haut = await state();
   }
+  const media = page.locator('iframe:visible, canvas:visible, svg:visible').first();
+  const mediaPixels = {};
+  async function sampleMedia(action) {
+    if (!await media.count()) return;
+    try {
+      const bytes = await media.screenshot({ timeout: 1500, animations: 'disabled' });
+      mediaPixels[action] = createHash('sha256').update(bytes).digest('hex');
+    } catch (error) {
+      issues.push('Média après ' + action + ': ' + error.message.split('\n')[0]);
+    }
+  }
+  await sampleMedia('reference');
   const buttons = page.locator('button:visible');
   const clickCount = Math.min(await buttons.count(), 6);
   for (let i = 0; i < clickCount; i++) {
@@ -76,9 +89,11 @@ async function inspect(browser, name, config) {
     let label;
     try {
       label = (await button.textContent({ timeout: 1500 })).trim();
-      await button.click({ timeout: 1800 });
+      if (name === 'mobile') await button.tap({ timeout: 1800 });
+      else await button.click({ timeout: 1800 });
       await pause(530);
       steps['bouton ' + i + ' ' + label] = await state();
+      await sampleMedia('bouton ' + i + ' ' + label);
     } catch (error) {
       issues.push('Interaction ' + (label || i) + ': ' + error.message.split('\n')[0]);
     }
@@ -94,9 +109,26 @@ async function inspect(browser, name, config) {
         await select.selectOption(alternate);
         await pause(480);
         steps['choix ' + i + ' ' + alternate] = await state();
+        await sampleMedia('choix ' + i + ' ' + alternate);
       }
     } catch (error) {
       issues.push('Select ' + i + ': ' + error.message.split('\n')[0]);
+    }
+  }
+  const radioGroups = await page.locator('input[type=radio]:visible').evaluateAll(
+    items => [...new Set(items.map(item => item.name))]
+  );
+  for (const group of radioGroups.slice(0, 5)) {
+    const option = page.locator('input[type=radio]:visible').filter({ visible: true });
+    const options = await option.all();
+    for (const candidate of options) {
+      if (await candidate.getAttribute('name') === group && !(await candidate.isChecked())) {
+        await candidate.check({ timeout: 1500 });
+        await pause(480);
+        steps['radio ' + group] = await state();
+        await sampleMedia('radio ' + group);
+        break;
+      }
     }
   }
   const range = page.locator('input[type=range]:visible').first();
@@ -122,7 +154,7 @@ async function inspect(browser, name, config) {
   await fs.writeFile(path.join(frameDir, 'concat.txt'), manifest.join('\n') + '\n');
   await page.screenshot({ path: path.join(output, name + '-apres.png') });
   await context.close();
-  return { issues, opening, steps, frames: frames.length, duration };
+  return { issues, opening, steps, mediaPixels, frames: frames.length, duration };
 }
 
 (async () => {
