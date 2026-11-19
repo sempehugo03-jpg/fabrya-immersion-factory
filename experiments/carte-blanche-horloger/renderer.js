@@ -139,7 +139,8 @@ canvas.addEventListener('keydown', event => {
   inspectAt(magnification * (event.key === '-' ? .92 : 1.08));
 });
 
-canvas.addEventListener('wheel', event => {
+window.addEventListener('wheel', event => {
+  if (event.ctrlKey || event.metaKey) return;
   event.preventDefault();
   inspectAt(magnification * Math.exp(event.deltaY * .0012));
 }, { passive: false });
