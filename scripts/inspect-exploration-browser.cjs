@@ -37,7 +37,7 @@ async function inspect(browser, name, config) {
         .map(el => el.textContent.trim()).slice(0, 15),
       controls: [...document.querySelectorAll('button,input,select,canvas,svg,video,a[href]')].map(el => ({
         tag: el.tagName.toLowerCase(), label: el.getAttribute('aria-label') || el.textContent.trim().slice(0, 60),
-        value: el.value, active: el.getAttribute('aria-pressed'),
+        value: el.value, active: el.getAttribute('aria-pressed'), zoom: el.dataset.zoom,
       })).slice(0, 25),
     }));
   }
