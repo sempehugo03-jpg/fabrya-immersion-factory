@@ -1,0 +1,1 @@
+Passage Clair accompagne des équipes culturelles qui rendent leurs visites accessibles. Les demandes portent tantôt sur les textes, tantôt sur l'orientation ou la préparation du public. La première prise de contact doit permettre de préciser le public et le lieu. Aucun certificat ni partenariat n'est confirmé.

@@ -43,7 +43,7 @@ def main():
     parser.add_argument("--url", required=True)
     parser.add_argument("--model", required=True)
     parser.add_argument("--out", type=lambda s: Path(s).resolve(), required=True)
-    parser.add_argument("--suite", choices=("original", "reliability"), default="original")
+    parser.add_argument("--suite", choices=("original", "reliability", "reliability-holdout"), default="original")
     parser.add_argument("--jobs", type=int, choices=(1, 2), default=1)
     parser.add_argument("--cap", type=int, default=2_300_000)
     parser.add_argument("--corrections", type=int, choices=(0, 1, 2), default=1)
@@ -53,8 +53,8 @@ def main():
     args.out.mkdir(parents=True, exist_ok=False)
     main_briefs = sorted((ROOT / "briefs/director/calibration").glob("*.md"))
     holdouts = sorted((ROOT / "briefs/director/holdout").glob("*.md"))
-    briefs = (sorted((ROOT / "briefs/director/reliability").glob("*.md"))
-              if args.suite == "reliability" else main_briefs + holdouts)
+    briefs = (main_briefs + holdouts if args.suite == "original"
+              else sorted((ROOT / "briefs/director" / args.suite).glob("*.md")))
     rows = []
     with ThreadPoolExecutor(max_workers=args.jobs) as pool:
         for row in pool.map(lambda brief: run_brief(brief, args), briefs):

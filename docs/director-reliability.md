@@ -46,3 +46,5 @@ python3 -m cinema_factory inspect /chemin/La-Traverse-master-1080p.mp4 \
 ```
 
 Le benchmark charge six briefs bruts issus de secteurs distincts. Le jeu est figé avant le premier passage. Il inclut un brief d'une ligne, un brief aux informations limitées, des prestations multiples et une contrainte de confidentialité. Le seuil est cinq dossiers acceptés. Le mode local utilise seulement l'interface loopback du modèle et ne soumet aucune génération vidéo.
+
+La suite `reliability-holdout` contient deux briefs de réserve. Elle utilise les mêmes contrôles et conserve des résultats distincts du seuil principal de cinq sur six.
