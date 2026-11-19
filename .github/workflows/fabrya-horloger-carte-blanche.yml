@@ -11,9 +11,9 @@ jobs:
   build:
     if: github.event.repository.private == false
     runs-on: ubuntu-24.04
-    timeout-minutes: 28
+    timeout-minutes: 21
     env:
-      FABRYA_LOCAL_MODEL: fabrya-local-qwen-7b-q3-k-m
+      FABRYA_LOCAL_MODEL: fabrya-local-qwen-coder-7b-q4-0
       FABRYA_BROWSER_EVIDENCE: '1'
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
     steps:
@@ -23,7 +23,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: fabrya-horloger-execution
-          run-id: 44567082422
+          run-id: 44568979770
           github-token: ${{ github.token }}
           path: fabrya-previous
       - name: Prepare public model and runtime
@@ -33,10 +33,10 @@ jobs:
           mkdir -p "$RUNNER_TEMP/fabrya-model" fabrya-run
           curl -fsSL --retry 2 --max-time 240 https://github.com/ggml-org/llama.cpp/releases/download/b12532/llama-b12532-bin-ubuntu-x64.tar.gz -o "$RUNNER_TEMP/llama.tar.gz"
           tar -xzf "$RUNNER_TEMP/llama.tar.gz" -C "$RUNNER_TEMP/fabrya-model"
-          curl -fsSL --retry 2 --max-time 420 https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF/resolve/bb5d59e/qwen2.5-7b-instruct-q3_k_m.gguf -o "$RUNNER_TEMP/fabrya-model/model.gguf"
+          curl -fsSL --retry 2 --max-time 420 https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/13fb94b/qwen2.5-coder-7b-instruct-q4_0.gguf -o "$RUNNER_TEMP/fabrya-model/model.gguf"
           sha256sum "$RUNNER_TEMP/fabrya-model/model.gguf" > fabrya-run/model-sha256.txt
           npm install --no-save playwright@1.57.0
-          echo "Streaming decoder; no creative instruction edits."
+          npx playwright install ffmpeg
       - name: Run the exact brief and collect browser observations
         shell: bash
         run: |
@@ -55,8 +55,7 @@ jobs:
             kill -0 "$server_pid" || { tail -20 fabrya-run/llama.log; exit 2; }
             sleep 1
           done
-          python3 experiments/horloger-carte-blanche/resume.py
-          python3 experiments/horloger-carte-blanche/produce.py
+          python3 experiments/horloger-carte-blanche/recover_browser.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:

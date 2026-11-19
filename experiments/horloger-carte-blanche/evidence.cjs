@@ -30,6 +30,9 @@ async function state(page) {
           tag: element.tagName, label: (element.getAttribute('aria-label') || element.textContent || '').trim(),
           href: element.getAttribute('href'), type: element.getAttribute('type'), id: element.id,
         })).slice(0, 35),
+      motion: Array.from(document.querySelectorAll('[class*="hand"], [id*="hand"], svg g, canvas')).slice(0, 18)
+        .map(el => ({ id: el.id, className: el.getAttribute('class'), transform: getComputedStyle(el).transform,
+          attr: el.getAttribute('transform'), size: [el.getBoundingClientRect().width, el.getBoundingClientRect().height] })),
       visuals: Array.from(document.querySelectorAll('canvas,svg,img,video')).filter(visible)
         .map(element => ({
           tag: element.tagName, width: Math.round(element.getBoundingClientRect().width),
@@ -108,7 +111,10 @@ async function inspect(browser, mode, config) {
   await page.screenshot({ path: path.join(folder, mode === 'molette' ? 'Ouverture.png' : mode + '-ouverture.png') });
   let advanced, paused, reverse;
   if (mode === 'molette') {
-    await page.mouse.move(760, 430);
+    for (let i = 0; i < 18; i++) {
+      await page.mouse.move(420 + i * 25, 470 - i * 7);
+      await page.waitForTimeout(45);
+    }
     for (let step = 0; step < 5; step++) {
       await page.mouse.wheel(0, 290);
       await page.waitForTimeout(420);
@@ -117,11 +123,13 @@ async function inspect(browser, mode, config) {
     await page.screenshot({ path: path.join(folder, 'molette-progression.png') });
     await page.waitForTimeout(800);
     paused = await state(page);
+    await page.screenshot({ path: path.join(folder, mode + "-pause.png") });
     for (let step = 0; step < 3; step++) {
       await page.mouse.wheel(0, -250);
       await page.waitForTimeout(410);
     }
     reverse = await state(page);
+    await page.screenshot({ path: path.join(folder, mode + "-retour.png") });
   }
   if (isMobile) {
     const cdp = await browserContext.newCDPSession(page);
@@ -133,9 +141,11 @@ async function inspect(browser, mode, config) {
     await page.screenshot({ path: path.join(folder, 'toucher-progression.png') });
     await page.waitForTimeout(800);
     paused = await state(page);
+    await page.screenshot({ path: path.join(folder, mode + "-pause.png") });
     await swipe(cdp, 260, 250, 700);
     await page.waitForTimeout(650);
     reverse = await state(page);
+    await page.screenshot({ path: path.join(folder, mode + "-retour.png") });
   }
   for (const item of config.interactions || []) {
     try {
