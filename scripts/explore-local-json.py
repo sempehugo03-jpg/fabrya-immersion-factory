@@ -40,7 +40,7 @@ def local_json_speaker(url, model):
         checkpoint = os.environ.get("FABRYA_REUSE_EXPLORATION")
         frozen_stages = {
             "unrestricted_exploration", "artistic_selection", "unrestricted_exploration_divergence",
-            "artistic_selection_divergence", "unrestricted_realization",
+            "artistic_selection_divergence", "unrestricted_realization", "unrestricted_critique",
         }
         if checkpoint and stage in frozen_stages:
             original = Path(checkpoint)
@@ -67,7 +67,9 @@ def local_json_speaker(url, model):
                     for group in groups.values()
                 ]
             validate(schema, output)
-            if output != json.loads((original / f"{stage}.json").read_text()):
+            validated_name = ("realisation-originale-avant-controle-factuel.json"
+                              if stage == "unrestricted_realization" else f"{stage}.json")
+            if output != json.loads((original / validated_name).read_text()):
                 raise Rejected("Preserved stage differs from its validated checkpoint")
             for name in (response_name, f"{stage}-transport-request-1.json"):
                 (run.directory / name).write_bytes((original / name).read_bytes())
@@ -83,21 +85,32 @@ def local_json_speaker(url, model):
                         "reason": {"type": "string"}},
                     "required": ["confirmed_facts", "reason"], "additionalProperties": False,
                 }
-                correction_instructions = (
-                    "Tu es FABRYA, auteur de cette vision. Le site demandé est une démonstration fictive. "
-                    "Corrige uniquement le statut des affirmations présentées comme faits réels. "
-                    "Les faits confirmés sont les citations littérales du brief qui décrivent réellement l'activité. "
-                    "Préserve ta fiction, ta mise en scène, tes interactions et tes décisions. "
-                    "Explique pourquoi les éléments retirés ne sont pas établis."
-                )
-                correction = speak(run, "factual_classification", correction_instructions, correction_schema,
-                                   [{"type": "input_text", "text": json.dumps({
-                                       "brief": json.loads(content[0]["text"])["brief"],
-                                       "vision": output,
-                                       "critique": json.loads((original / "unrestricted_critique.json").read_text()),
-                                   }, ensure_ascii=False)}])
-                write_json(run.directory / "factual_classification.json", correction)
+                source_response = original / "factual_classification-transport-response-1.json"
+                raw_correction = json.loads(source_response.read_text())
+                if raw_correction.get("model") != model:
+                    raise Rejected("Factual classification used a different model")
+                candidate = raw_correction["choices"][0]
+                if candidate["finish_reason"] != "stop":
+                    raise Rejected("Factual classification was incomplete")
+                correction = json.loads(candidate["message"]["content"], object_pairs_hook=unique_fields)
+                validate(correction_schema, correction)
+                if correction != json.loads((original / "factual_classification.json").read_text()):
+                    raise Rejected("Factual classification differs from its validated checkpoint")
+                for path in original.glob("factual_classification*.json"):
+                    (run.directory / path.name).write_bytes(path.read_bytes())
                 output = {**output, "confirmed_facts": correction["confirmed_facts"]}
+                if output != json.loads((original / f"{stage}.json").read_text()):
+                    raise Rejected("Corrected vision differs from its validated checkpoint")
+            if stage == "unrestricted_critique":
+                write_json(run.directory / "critique-originale-avant-normalisation.json", output)
+                vision = json.loads(content[0]["text"])["vision"]
+                documented_fiction = {text.strip().casefold() for text in vision["fiction"]}
+                flags = output["unsupported_client_claims"]
+                removed = [flag for flag in flags if flag.strip().casefold() in documented_fiction]
+                remaining = [flag for flag in flags if flag.strip().casefold() not in documented_fiction]
+                output = {**output, "unsupported_client_claims": remaining}
+                run.record("factual_review_normalization", "completed",
+                           exact_matches_to_declared_fiction=removed, remaining_claims=remaining)
             return output
         if stage == "unrestricted_critique":
             instructions += (

@@ -20,7 +20,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh run download 44565045198 --name fabrya-horloger --dir "$RUNNER_TEMP/horloger-checkpoint"
+          gh run download 44566612406 --name fabrya-horloger --dir "$RUNNER_TEMP/horloger-checkpoint"
       - name: Run the original creative pipeline and model-authored production
         shell: bash
         run: |
