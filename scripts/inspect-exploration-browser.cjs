@@ -16,6 +16,9 @@ async function inspect(browser, name, config) {
   page.on('pageerror', error => issues.push(error.message));
   page.on('requestfailed', request => issues.push(request.method() + ' ' + request.url()));
   await page.goto(pathToFileURL(source).href, { waitUntil: "domcontentloaded", timeout: 20000 });
+  if (await page.locator('#fabrya-stage').count()) {
+    await page.locator('#fabrya-stage[data-zoom]').waitFor({ state: 'attached', timeout: 6000 });
+  }
   const cdp = await context.newCDPSession(page);
   const frames = [];
   const now = () => performance.now();
