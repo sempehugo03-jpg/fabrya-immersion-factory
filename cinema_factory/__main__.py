@@ -8,6 +8,7 @@ from time import monotonic
 
 from .contracts import Blocked, Rejected, validate_destination, validate_plan
 from .director import OFFERS, compile_direction, media_cost, propose, read_history, shot_key
+from .exploration import explore, load_comparison
 from .inspection import constrain_revision, correction_scope, evaluate, inspect_movie
 from .local_model import local_speaker
 from .film import build_site, probe
@@ -40,6 +41,21 @@ def parse_args():
                              help="hypothetical media envelope; design does not submit media")
             sub.add_argument("--local-url", help="loopback llama.cpp URL for no-charge bench")
             sub.add_argument("--local-model", default="qwen2.5")
+    creative = modes.add_parser("explore", help="develop an unrestricted ideal vision and a separate strategy")
+    creative.add_argument("brief", type=Path)
+    creative.add_argument("--out", type=Path, required=True)
+    creative.add_argument("--history", type=Path, action="append", default=[],
+                          help="prior ideal vision JSON for mechanism comparison during selection only")
+    creative.add_argument("--assets", type=Path, help="authorized footage inventory for engineering only")
+    creative.add_argument("--production-cap-microusd", type=int,
+                          help="hypothetical production envelope, separate from the text-call budget")
+    creative.add_argument("--budget-microusd", type=int, default=0,
+                          help="authorized per-run text inference limit")
+    creative.add_argument("--funds", type=Path, help="fresh verification of OpenAI funds")
+    creative.add_argument("--local-url", help="loopback llama.cpp URL for local text inference")
+    creative.add_argument("--local-model", default="qwen2.5")
+    creative.add_argument("--no-divergence", action="store_true",
+                          help="limit inference to the initial exploration and selection")
     inspect = modes.add_parser("inspect", help="measure existing real film without API calls")
     inspect.add_argument("master", type=Path)
     inspect.add_argument("--plan", type=Path, required=True)
@@ -243,6 +259,47 @@ def launch(args, run):
     raise Rejected("No deliverable")
 
 
+def launch_exploration(args, run):
+    brief = args.brief.read_text().strip()
+    if not brief or len(brief.encode()) > 8_000:
+        raise Rejected("The brief must contain 1–8,000 UTF-8 bytes")
+    if args.production_cap_microusd is not None and args.production_cap_microusd < 0:
+        raise Rejected("Invalid hypothetical production budget")
+    if args.local_url:
+        speaker = local_speaker(args.local_url, args.local_model)
+    else:
+        if run.cap <= 0:
+            raise Blocked("No authorized text inference budget")
+        run.funds = read_funds(args.funds)
+        run.record("funds", "verified_by_operator", balances=run.funds)
+        speaker = speak
+
+    comparison = load_comparison(args.history)
+    write_json(run.directory / "context-boundary.json", {
+        "brief_sha256": digest(args.brief),
+        "history_selection_only": [digest(path) for path in args.history],
+        "runtime_mode": "local" if args.local_url else "provider",
+    })
+
+    def production_context():
+        assets = read_assets(args.assets)
+        availability = capabilities()
+        # Credentials and verification are distinct from creative possibilities.
+        # No provider is called to confirm or execute this hypothetical strategy.
+        funds = run.funds or {}
+        return {
+            "authorized_footage": {key: {k: v for k, v in asset.items() if k != "path"}
+                                   for key, asset in assets.items()},
+            "current_route_specifications": ROUTES,
+            "routes_with_credentials": list(routes_for(assets, 1)),
+            "providers_with_verified_funds": [provider for provider in funds if provider != "openai"],
+            "local_executables": {name: bool(path) for name, path in availability["executables"].items()},
+            "hypothetical_budget_microusd": args.production_cap_microusd,
+        }
+
+    explore(speaker, run, brief, comparison, production_context, divergence=not args.no_divergence)
+
+
 def main():
     args = parse_args()
     if args.mode == "doctor":
@@ -270,6 +327,8 @@ def main():
             else:
                 inspect_movie(args.master, plan, run.directory, observations)
             run.record("inspection", "completed", artist_review=bool(args.local_url))
+        elif args.mode == "explore":
+            launch_exploration(args, run)
         else:
             launch(args, run)
     except (Blocked, Rejected, OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as exc:

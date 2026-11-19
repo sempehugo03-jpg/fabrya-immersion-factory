@@ -7,3 +7,5 @@
 [Réalisateur cinématographique autonome](docs/autonomous-cinematic-director.md). Le mode `design` exécute un brief en conception seule. Le mode `inspect` réexamine un film existant.
 
 [Correctif de fiabilité et benchmarks du réalisateur](docs/director-reliability.md).
+
+[Exploration créative libre et audit des cinq dossiers](docs/unrestricted-creative-exploration.md). Le mode `explore` conserve la vision idéale et la stratégie de production dans deux fichiers distincts.

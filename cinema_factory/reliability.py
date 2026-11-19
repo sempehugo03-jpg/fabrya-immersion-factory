@@ -54,7 +54,7 @@ class CreativeRejection(Rejected):
     """A structural fix would leave the same rejected creative decision."""
 
 
-def _stage(speaker, run, work, stage, instructions, schema, payload, sources):
+def _stage(speaker, run, work, stage, instructions, schema, payload, sources, *, record_request=False):
     content = json.dumps({**payload, "rule": RULE}, ensure_ascii=False, sort_keys=True)
     write_json(work / f"{stage}-provenance.json", {
         "sources": sources, "system_sha256": hashlib.sha256(instructions.encode()).hexdigest(),
@@ -63,7 +63,12 @@ def _stage(speaker, run, work, stage, instructions, schema, payload, sources):
         "input_keys": sorted(payload),
         "previous_response": None, "retrieval": False,
     })
-    result = speaker(run, stage, instructions, schema, [{"type": "input_text", "text": content}])
+    messages = [{"type": "input_text", "text": content}]
+    if record_request:
+        write_json(work / f"{stage}-request.json", {
+            "instructions": instructions, "input": messages, "schema": schema,
+        })
+    result = speaker(run, stage, instructions, schema, messages)
     write_json(work / f"{stage}.json", result)
     validate(schema, result)
     return result
