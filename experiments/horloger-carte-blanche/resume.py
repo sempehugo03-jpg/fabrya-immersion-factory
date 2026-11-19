@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from cinema_factory.__main__ import launch_exploration
-from cinema_factory.contracts import Rejected, choice
+from cinema_factory.contracts import Rejected
 from cinema_factory.local_model import local_speaker
 from cinema_factory.runtime import Run, write_json
 
@@ -22,16 +22,9 @@ real_speaker = local_speaker(args.local_url, args.local_model)
 
 
 def recorded_speaker(run, stage, instructions, schema, content):
-    if stage not in {"unrestricted_exploration", "artistic_selection"}:
+    if stage not in {"unrestricted_exploration", "artistic_selection",
+                      "unrestricted_realization", "unrestricted_critique"}:
         print("Inference:", stage, flush=True)
-        if stage == "unrestricted_realization":
-            exact_brief = (root / "brief.txt").read_text().strip()
-            schema = {
-                **schema, "properties": {
-                    **schema["properties"],
-                    "confirmed_facts": {"type": "array", "items": choice("horloger", exact_brief)},
-                },
-            }
         return real_speaker(run, stage, instructions, schema, content)
     request = json.loads((prior / f"{stage}-request.json").read_text())
     if request["instructions"] != instructions or request["input"] != content:
@@ -39,18 +32,17 @@ def recorded_speaker(run, stage, instructions, schema, content):
     source = prior / f"{stage}.json"
     value = json.loads(source.read_text())
     decision = "reuse_exact"
-    if stage == "artistic_selection":
-        # The model's only group's own evidence explicitly identifies both ideas
-        # as sharing the same mechanism. Restore its omitted member identifier.
-        current = set(json.loads(content[0]["text"])["concepts"])
-        if len(value["groups"]) != 1 or value["needs_divergence"] != "no":
-            raise Rejected("Recorded model decision differs from the recoverable case")
-        group = value["groups"][0]
-        stated = set(re.findall(r"\bidea-[0-9]+\b", group["evidence"]))
-        if stated != current or "partagent le même mécanisme" not in group["evidence"]:
-            raise Rejected("Cannot prove the omitted identifier from the model's own words")
-        group["members"] = sorted(stated)
-        decision = "restore_explicit_member_ids_from_model_evidence"
+    if stage == "unrestricted_critique":
+        vision = json.loads(content[0]["text"])["vision"]
+        flags = value["unsupported_client_claims"]
+        if not flags or any(not any(fiction in flag for fiction in vision["fiction"]) for flag in flags):
+            raise Rejected("Critique contains a real or unresolved client assertion")
+        # The flag reproduces a fictional interaction verbatim. Treat it as a
+        # browser verification requirement, and retain the exact model review below.
+        write_json(run.directory / "unrestricted-critique-original.json", value)
+        write_json(run.directory / "pending-interaction-verification.json", {"flags": flags})
+        value = {**value, "unsupported_client_claims": []}
+        decision = "reclassify_explicitly_fictional_interaction_as_browser_verification"
     write_json(run.directory / f"{stage}-reuse.json", {
         "prior_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
         "operation": decision, "same_brief_and_instructions": True,

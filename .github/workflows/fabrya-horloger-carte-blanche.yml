@@ -23,7 +23,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: fabrya-horloger-execution
-          run-id: 44565104326
+          run-id: 44567082422
           github-token: ${{ github.token }}
           path: fabrya-previous
       - name: Prepare public model and runtime
