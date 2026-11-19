@@ -10,7 +10,7 @@ from cinema_factory.prompting import video_request
 from cinema_factory.providers import ROUTES
 from cinema_factory.reliability import CreativeRejection, assess, compile_candidate, production_options
 from cinema_factory.runtime import digest
-from cinema_factory.visual_evidence import apply_measured_defects, check_evidence, frame_positions
+from cinema_factory.visual_evidence import apply_measured_defects, check_evidence, frame_positions, ground_review
 
 
 def creative_fixture():
@@ -204,3 +204,23 @@ class KnownVisualDefects(unittest.TestCase):
         (self.work / self.rows[0]["file"]).write_text("modified")
         with self.assertRaisesRegex(Rejected, "modified"):
             self.defects()
+
+
+    def test_vision_can_pass_with_matching_desktop_and_mobile_frames(self):
+        desktop = self.rows[0]
+        mobile = next(r for r in self.rows if r["profile"] == "mobile" and r["frame"] == desktop["frame"])
+        raw = {"axes": {"composition": {"shot": 0, "time": desktop["time"],
+                                         "frames": [desktop["id"], mobile["id"]]}}}
+        report = {"axes": [{"axis": "composition", "grade": "PASS", "evidence": "Sujet dans les deux cadres."}],
+                  "diagnoses": []}
+        self.assertEqual(ground_review(raw, deepcopy(report), self.rows, [])["axes"][0]["grade"], "PASS")
+        raw["axes"]["composition"]["frames"][1] = self.rows[-1]["id"]
+        self.assertEqual(ground_review(raw, deepcopy(report), self.rows, [])["axes"][0]["grade"], "UNVERIFIED")
+
+    def test_citing_the_wrong_time_blocks_artistic_evidence(self):
+        row = self.rows[0]
+        raw = {"axes": {"composition": {"shot": 0, "time": row["time"]+1,
+                                         "frames": [row["id"]]}}}
+        report = {"axes": [{"axis": "composition", "grade": "PASS"}], "diagnoses": []}
+        with self.assertRaisesRegex(Rejected, "does not match"):
+            ground_review(raw, report, self.rows, [])
