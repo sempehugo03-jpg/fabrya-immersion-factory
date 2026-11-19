@@ -167,7 +167,7 @@ class FinanceTests(unittest.TestCase):
 class ReviewContractTests(unittest.TestCase):
     def test_each_axis_has_an_observation_and_failed_axes_have_linked_diagnoses(self):
         plan = json.loads(REFERENCE.read_text())
-        review = {"axes": {axis: dict(grade="PASS", shot=0, time=4, evidence="Image observée.",
+        review = {"axes": {axis: dict(grade="PASS", shot=0, time=4, evidence=f"Observation de test : {axis}.",
                                     scope="stop", confidence="medium", correction="")
                            for axis in AXES}, "limitations": []}
         review["axes"]["composition"].update(grade="REVISE", scope="reframe", correction="Décaler le cadre.")
@@ -177,6 +177,14 @@ class ReviewContractTests(unittest.TestCase):
         self.assertEqual(result["diagnoses"][0]["time"], 4)
         del review["axes"]["photoréalisme"]
         with self.assertRaises(Rejected):
+            normalize_review(review, plan)
+
+    def test_generic_repeated_passing_evidence_is_rejected(self):
+        plan = json.loads(REFERENCE.read_text())
+        review = {"axes": {axis: dict(grade="PASS", shot=0, time=4, evidence="Tout est bien visible.",
+                                    scope="stop", confidence="high", correction="")
+                           for axis in AXES}, "limitations": []}
+        with self.assertRaisesRegex(Rejected, "axis-specific"):
             normalize_review(review, plan)
 
 

@@ -45,6 +45,8 @@ Le Kling texte a été démontré en direct sur La Traverse au jalon précédent
 
 Pour chaque plan, quatre planches présentent 8 vues dans le cadre source et les mêmes 8 positions dans le cadre mobile. Les variations d'image sont mesurées à 12 vues/s. Le signal photométrique aide à repérer les gels et les changements, avec une limite explicite sur l'inférence du mouvement spatial. La critique image est une requête séparée qui reçoit le brief, la découverte choisie et les observations. Elle ne reçoit pas le prompt complet de production. Le contrat exige une observation pour chacun des huit axes. Le diagnostic de chaque défaut reprend l'axe, le plan et l'horodatage de cette observation.
 
+Une même observation recyclée sur plusieurs critères validés fait rejeter la critique. Des observations distinctes peuvent toutefois rester trop vagues ou inexactes pour constituer une acceptation artistique humaine.
+
 La boucle accepte zéro à deux corrections. Un problème de cadrage, de découpage ou de contenu commercial peut réutiliser les mêmes vidéos. Une coupe de correction ne peut que réduire la plage existante. Un défaut de prompt, de fournisseur ou de continuité peut autoriser un nouvel appel seulement pour les plans ciblés, dans le plafond. Les défauts de lecteur, les sources incertaines et les diagnostics de confiance faible stoppent la correction payante. Un échec conserve les étapes et les médias déjà produits.
 
 ## Offres et plafonds

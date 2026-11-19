@@ -19,8 +19,9 @@ ceux utilisés par le lecteur. Les mesures de mouvement photométrique ne prouve
 parallaxe, la trajectoire ou la stabilité anatomique. Cherche le banal, les mouvements
 sans découverte, la perspective incohérente, les objets, traits, gestes et matières instables,
 les faux raccords, et la perte de sens lorsqu'on s'arrête ou joue en sens inverse.
-Sépare l'intention écrite de ce que tu peux observer. Un PASS exige une observation concrète,
-un axe incertain est UNVERIFIED. Donne une phrase courte d'observation par axe, avec l'index
+Sépare l'intention écrite de ce que tu peux observer. Un PASS exige une observation concrète
+et spécifique à l'axe. Ne recycle jamais la même preuve entre critères. Un axe incertain est
+UNVERIFIED. Donne une phrase courte d'observation par axe, avec l'index
 du plan et la seconde relative. Pour un axe non validé, donne la correction minimale plausible :
 recadrer (reframe), monter
 (edit), corriger texte/action (commercial), lecteur (player), prompt, provider, continuity,
@@ -120,6 +121,7 @@ def normalize_review(review, plan):
     validate(CRITIQUE, review)
     axes = []
     diagnoses = []
+    passing_evidence = set()
     for axis, observation in review["axes"].items():
         index = observation["shot"]
         duration = sum(s["seconds"] for s in plan["shots"]) if index == -1 else (
@@ -128,6 +130,11 @@ def normalize_review(review, plan):
             raise Rejected(f"Critique needs an observation and a valid timestamp for {axis}")
         grade = observation["grade"]
         correction = observation["correction"]
+        if grade == "PASS":
+            evidence = " ".join(observation["evidence"].casefold().split()).rstrip(".!?")
+            if evidence in passing_evidence:
+                raise Rejected("Passing artistic axes require distinct, axis-specific visual evidence")
+            passing_evidence.add(evidence)
         axes.append(dict(axis=axis, grade=grade, evidence=observation["evidence"],
                          fix=correction if grade != "PASS" else ""))
         if grade != "PASS":
