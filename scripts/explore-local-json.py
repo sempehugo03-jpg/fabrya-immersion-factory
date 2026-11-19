@@ -38,7 +38,7 @@ def unique_fields(pairs):
 def local_json_speaker(url, model):
     def speak(run, stage, instructions, schema, content):
         resume_path = os.environ.get("FABRYA_RESUME_STAGES")
-        if resume_path and stage in {"unrestricted_exploration", "artistic_selection", "unrestricted_realization"}:
+        if resume_path and stage in {"unrestricted_exploration", "artistic_selection", "unrestricted_realization", "unrestricted_critique"}:
             original = Path(resume_path)
             request_name = f"{stage}-request.json"
             if (original / request_name).read_bytes() != (run.directory / request_name).read_bytes():
@@ -58,6 +58,21 @@ def local_json_speaker(url, model):
                 if output["confirmed_facts"] != claimed:
                     run.record("factual_metadata_validation", "filtered_unquoted_claims",
                                removed_count=len(claimed) - len(output["confirmed_facts"]))
+            if stage == "unrestricted_critique":
+                (run.directory / f"{stage}-original.json").write_bytes(raw)
+                vision = json.loads((original / "unrestricted_realization.json").read_text())
+                flags = output["unsupported_client_claims"]
+                retained = [
+                    claim for claim in flags
+                    if not (claim.startswith("Le visiteur peut ") and any(
+                        passage.startswith(claim + ",") or passage == claim
+                        for passage in vision["fiction"]
+                    ))
+                ]
+                output["unsupported_client_claims"] = retained
+                if retained != flags:
+                    run.record("factual_metadata_validation", "fictional_interface_capabilities",
+                               fields=[claim for claim in flags if claim not in retained])
             return output
         preserved = os.environ.get("FABRYA_REUSE_EXPLORATION")
         if stage == "unrestricted_exploration" and preserved:
