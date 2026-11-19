@@ -8,7 +8,9 @@ const output = path.resolve(process.argv[3]);
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 async function inspect(browser, name, config) {
-  const context = await browser.newContext(config);
+  const context = await browser.newContext({
+    ...config, recordVideo: { dir: output, size: config.viewport },
+  });
   await context.route(/https?:\/\//, route => route.abort());
   const page = await context.newPage();
   const issues = [];
@@ -121,7 +123,9 @@ async function inspect(browser, name, config) {
   }
   await fs.writeFile(path.join(frameDir, 'concat.txt'), manifest.join('\n') + '\n');
   await page.screenshot({ path: path.join(output, name + '-apres.png') });
+  const video = page.video();
   await context.close();
+  await fs.rename(await video.path(), path.join(output, name + '.webm'));
   return { issues, opening, steps, frames: frames.length, duration };
 }
 
