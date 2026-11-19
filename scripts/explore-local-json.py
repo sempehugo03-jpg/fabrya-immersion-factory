@@ -14,7 +14,7 @@ def local_json_speaker(url, model):
     def speak(run, stage, instructions, schema, content):
         stage_request = {
             "model": model, "stream": False, "temperature": .32, "seed": 19,
-            "max_tokens": 2700,
+            "max_tokens": 1800,
             "messages": [
                 {"role": "system", "content": instructions + "\nRéponds uniquement avec un objet JSON valide et compact conforme à ce schéma JSON. Évite les espaces de mise en forme.\n" + json.dumps(schema, ensure_ascii=False, separators=(",", ":"))},
                 {"role": "user", "content": "\n".join(item["text"] for item in content)},
@@ -22,7 +22,11 @@ def local_json_speaker(url, model):
             "response_format": {"type": "json_object"},
         }
         wire = run.directory / f"{stage}-transport-request.json"
-        for attempt, seed in enumerate((19, 23, 29), 1):
+        for attempt, seed in enumerate((23, 29), 1):
+            stage_request["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {"name": stage, "strict": True, "schema": schema},
+            }
             stage_request["seed"] = seed
             write_json(wire.with_name(f"{wire.stem}-{attempt}.json"), stage_request)
             result = request_json(url.rstrip("/") + "/v1/chat/completions", headers={}, timeout=480,
@@ -36,9 +40,14 @@ def local_json_speaker(url, model):
                     raise Rejected("Local model did not complete the response")
                 output = json.loads(completion["message"]["content"])
                 validate(schema, output)
+                if stage.startswith("artistic_selection"):
+                    expected = schema["properties"]["selected"]["enum"]
+                    members = [member for group in output["groups"] for member in group["members"]]
+                    if sorted(members) != sorted(expected):
+                        raise Rejected("Selection groups must partition the current concept IDs")
                 return output
             except (ValueError, Rejected) as failure:
-                run.record("local_schema_validation", "rejected", stage=stage, attempt=attempt,
+                run.record("local_schema_validation", "rejected", phase=stage, attempt=attempt,
                            reason=str(failure))
         raise Rejected("All local responses failed schema validation")
     return speak
