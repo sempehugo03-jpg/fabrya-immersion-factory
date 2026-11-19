@@ -1,0 +1,90 @@
+name: FABRYA — Média et site horloger
+on:
+  push:
+    branches:
+      - experiment/carte-blanche-horloger
+    paths:
+      - .github/workflows/fabrya-horloger-media.yml
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Render the preserved vision
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p run/exploration
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          seed=json.loads(Path("experiments/carte-blanche-horloger/decision.json").read_text())
+          Path("run/brief.txt").write_text(seed.pop("brief"))
+          for name, data in seed.items():
+              (Path("run/exploration")/name).write_text(json.dumps(data,ensure_ascii=False,indent=2)+"\n")
+          PY
+          curl -fsSL --retry 2 -o "$RUNNER_TEMP/llama.tar.gz" https://github.com/ggml-org/llama.cpp/releases/download/b12532/llama-b12532-bin-ubuntu-x64.tar.gz
+          tar -xzf "$RUNNER_TEMP/llama.tar.gz" -C "$RUNNER_TEMP"
+          curl -fsSL --retry 2 -o "$RUNNER_TEMP/model.gguf" https://huggingface.co/bartowski/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/1f629da0c8bed16b9e50cee91c70693650e66c35/Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf
+          server=$(find "$RUNNER_TEMP" -name llama-server -type f -print -quit)
+          nohup "$server" -m "$RUNNER_TEMP/model.gguf" --alias fabrya-qwen25-coder-7b --host 127.0.0.1 --port 18228 -c 12288 -t 4 -tb 4 -np 1 --no-warmup > run/llama.log 2>&1 </dev/null &
+          for attempt in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:18228/health >/dev/null; then break; fi
+            sleep 2
+          done
+          python3 scripts/make-exploration-media.py --exploration run/exploration --brief run/brief.txt --evidence run/production --website run/website --port 18228 --model fabrya-qwen25-coder-7b --phase media
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: horloger-media
+          path: run/
+          retention-days: 1
+      - name: Assemble the autonomous site
+        run: python3 scripts/make-exploration-media.py --exploration run/exploration --brief run/brief.txt --evidence run/production --website run/website --port 18228 --model fabrya-qwen25-coder-7b --phase assembly
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: horloger-assembly
+          path: run/
+          retention-days: 1
+      - name: Capture actual browser behavior and ask the model to review it
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-save playwright@1.58.0
+          export FABRYA_BROWSER_PATH
+          FABRYA_BROWSER_PATH=$(command -v google-chrome)
+          node scripts/inspect-exploration-browser.cjs run/website/index.html run/browser-original
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          source=json.loads(Path("run/browser-original/observations.json").read_text())
+          compact={}
+          for viewport,result in source.items():
+              entries={"errors":result["issues"],"opening":result["opening"]["visibleText"][:6]}
+              for name,state in result["steps"].items():
+                  entries[name]={"scrollY":state["scrollY"],"text":state["visibleText"][:5]}
+              compact[viewport]=entries
+          Path("run/browser-observations.json").write_text(json.dumps(compact,ensure_ascii=False))
+          PY
+          cp run/website/index.html run/production/premier-rendu.html
+          if python3 scripts/realize-exploration.py --exploration run/exploration --brief run/brief.txt --evidence run/production --site run/website/index.html --port 18228 --model fabrya-qwen25-coder-7b --review run/browser-observations.json; then
+            printf '%s\n' processed > run/production/review-status.txt
+          else
+            printf '%s\n' rejected > run/production/review-status.txt
+          fi
+          if cmp -s run/production/premier-rendu.html run/website/index.html; then
+            mv run/browser-original run/browser-final
+          else
+            node scripts/inspect-exploration-browser.cjs run/website/index.html run/browser-final
+            rm -rf run/browser-original/*-frames
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: horloger-observations
+          path: run/
+          retention-days: 1
