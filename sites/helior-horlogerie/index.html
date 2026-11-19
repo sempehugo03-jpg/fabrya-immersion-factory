@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hélior Horlogerie</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Hélior, manufacture horlogère fictive. Le calibre H-01 se dévoile au rythme de la molette : couronne, vue éclatée, balancier et finitions.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..700;1,6..96,400..700&family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@300..600&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a class="skip" href="#rdv">Aller au formulaire de rendez-vous</a>
+
+<div class="backdrop" aria-hidden="true"></div>
+<canvas id="scene" aria-hidden="true"></canvas>
+<div class="veil" aria-hidden="true"></div>
+
+<div class="loader" aria-hidden="true">
+  <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44"></circle></svg>
+  <span>Remontage du mouvement</span>
+</div>
+
+<header class="top">
+  <a class="brand" href="#ouverture">Hélior<span>Manufacture horlogère</span></a>
+  <div class="top-actions">
+    <button class="sound" id="sound" type="button" aria-pressed="false" title="Entendre le battement du balancier" aria-label="Entendre le battement du balancier">
+      <i aria-hidden="true"></i><span>Battement</span>
+    </button>
+    <a class="top-cta" href="#rdv">Rendez-vous privé</a>
+  </div>
+</header>
+
+<nav class="chapters" aria-label="Chapitres">
+  <ol>
+    <li><a href="#ouverture" data-nav="0"><b>XII</b><span>Ouverture</span></a></li>
+    <li><a href="#boite" data-nav="1"><b>I</b><span>La boîte</span></a></li>
+    <li><a href="#eclatee" data-nav="2"><b>II</b><span>Vue éclatée</span></a></li>
+    <li><a href="#coeur" data-nav="3"><b>III</b><span>Le cœur</span></a></li>
+    <li><a href="#finitions" data-nav="4"><b>IV</b><span>Finitions</span></a></li>
+    <li><a href="#cadrans" data-nav="5"><b>V</b><span>Cadrans</span></a></li>
+    <li><a href="#rdv" data-nav="6"><b>VI</b><span>Rendez-vous</span></a></li>
+  </ol>
+</nav>
+
+<div class="reserve" aria-hidden="true">
+  <svg viewBox="0 0 120 80">
+    <path class="reserve-track" d="M14 66 A46 46 0 0 1 106 66"></path>
+    <path class="reserve-fill" id="reserve-fill" d="M14 66 A46 46 0 0 1 106 66"></path>
+    <g class="reserve-ticks" id="reserve-ticks"></g>
+    <line class="reserve-needle" id="reserve-needle" x1="60" y1="66" x2="60" y2="26"></line>
+    <circle class="reserve-hub" cx="60" cy="66" r="3"></circle>
+  </svg>
+  <div class="reserve-label"><span>Réserve de marche</span><b id="reserve-value">0 h</b></div>
+</div>
+
+<main>
+  <section id="ouverture" class="chapter hero" data-chapter="0">
+    <div class="panel">
+      <p class="eyebrow"><b>XII</b> Calibre H-01 · remontage manuel</p>
+      <h1>Le temps se règle <em>à la main</em>.</h1>
+      <p class="lede">Quarante millimètres, cent quatre-vingt-sept composants, assemblés un à un à l'établi. Tournez la molette : la couronne remonte le ressort, les aiguilles avancent, et le mouvement se dévoile.</p>
+      <p class="hint"><span class="hint-crown" aria-hidden="true"></span>Faites défiler pour remonter le mouvement</p>
+    </div>
+  </section>
+
+  <section id="boite" class="chapter" data-chapter="1">
+    <div class="panel">
+      <p class="eyebrow"><b>I</b> La boîte</p>
+      <h2>Une carrure tournée, <em>puis polie à la main</em>.</h2>
+      <p>Flancs satinés, lunette polie miroir, couronne crantée de trente-six stries pour garder la prise sous le pouce. La boîte du H-01 est usinée dans un lingot d'acier, puis reprise au tour et à la meule.</p>
+      <dl class="specs">
+        <div><dt>Diamètre</dt><dd>40,0 mm</dd></div>
+        <div><dt>Épaisseur</dt><dd>11,2 mm</dd></div>
+        <div><dt>Entre-cornes</dt><dd>20 mm</dd></div>
+        <div><dt>Étanchéité</dt><dd>10 bar</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <section id="eclatee" class="chapter" data-chapter="2">
+    <div class="panel">
+      <p class="eyebrow"><b>II</b> Vue éclatée</p>
+      <h2>Neuf niveaux, <em>de la glace au fond</em>.</h2>
+      <p>Chaque étage se détache dans l'ordre exact du démontage à l'atelier : glace saphir, lunette, aiguilles, cadran, ponts, rouage, platine, carrure, fond. Rien n'est collé, tout est vissé, chaque pièce peut être révisée pendant des générations.</p>
+    </div>
+  </section>
+
+  <section id="coeur" class="chapter" data-chapter="3">
+    <div class="panel">
+      <p class="eyebrow"><b>III</b> Le cœur</p>
+      <h2>Huit battements <em>par seconde</em>.</h2>
+      <p>Le balancier oscille quatre fois par seconde, retenu par un spiral plus fin qu'un cheveu. Ici, le temps ralentit pour que l'œil suive l'échappement : l'ancre bascule, la roue avance d'une demi-dent, et la petite seconde progresse par huitièmes.</p>
+      <dl class="stats">
+        <div><dt>Fréquence</dt><dd>28 800<small>alt/h</small></dd></div>
+        <div><dt>Réserve de marche</dt><dd>72<small>h</small></dd></div>
+        <div><dt>Rubis</dt><dd>21</dd></div>
+        <div><dt>Réglage</dt><dd>±2<small>s/jour</small></dd></div>
+      </dl>
+      <p class="note">Animation ralentie ×4 dans ce chapitre.</p>
+    </div>
+  </section>
+
+  <section id="finitions" class="chapter" data-chapter="4">
+    <div class="panel">
+      <p class="eyebrow"><b>IV</b> Finitions</p>
+      <h2>Ce que personne ne verra, <em>nous le finissons quand même</em>.</h2>
+      <ul class="crafts">
+        <li><b>Côtes de Genève</b><span>Bandes parallèles tracées à la meule sur chaque pont.</span></li>
+        <li><b>Perlage</b><span>Des centaines de cercles qui se chevauchent sur la platine.</span></li>
+        <li><b>Anglage</b><span>Arêtes chanfreinées à 45° et polies au bois de gentiane.</span></li>
+        <li><b>Vis bleuies</b><span>Chauffées à la flamme jusqu'à 290 °C, jusqu'au bleu roi.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="cadrans" class="chapter" data-chapter="5">
+    <div class="panel">
+      <p class="eyebrow"><b>V</b> Cadrans</p>
+      <h2>Trois cadrans, <em>une seule heure</em>.</h2>
+      <p>Le mouvement ne change pas. Le cadran, lui, se choisit. Touchez une finition pour la poser sur la montre.</p>
+      <div class="dials" role="group" aria-label="Choisir le cadran">
+        <button type="button" data-dial="nuit" aria-pressed="true"><i class="sw sw-nuit" aria-hidden="true"></i><span><b>Bleu nuit</b>Soleillé, index or</span></button>
+        <button type="button" data-dial="email" aria-pressed="false"><i class="sw sw-email" aria-hidden="true"></i><span><b>Émail grand feu</b>Blanc, aiguilles bleuies</span></button>
+        <button type="button" data-dial="ardoise" aria-pressed="false"><i class="sw sw-ardoise" aria-hidden="true"></i><span><b>Ardoise</b>Guilloché à la main</span></button>
+      </div>
+    </div>
+  </section>
+
+  <section id="rdv" class="chapter right" data-chapter="6">
+    <div class="panel">
+      <p class="eyebrow"><b>VI</b> Rendez-vous</p>
+      <h2>Essayez-la <em>au poignet</em>.</h2>
+      <p>Les présentations se font à l'atelier, sur rendez-vous, une personne à la fois. Indiquez votre cadran préféré, nous préparons la pièce.</p>
+      <form id="rdv-form" novalidate>
+        <div class="field">
+          <label for="nom">Nom</label>
+          <input id="nom" name="nom" type="text" autocomplete="name" required>
+        </div>
+        <div class="field">
+          <label for="email">Adresse e-mail</label>
+          <input id="email" name="email" type="email" autocomplete="email" required>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label for="cadran">Cadran</label>
+            <select id="cadran" name="cadran">
+              <option value="nuit">Bleu nuit soleillé</option>
+              <option value="email">Émail grand feu</option>
+              <option value="ardoise">Ardoise guillochée</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="date">Date souhaitée</label>
+            <input id="date" name="date" type="date">
+          </div>
+        </div>
+        <button class="submit" type="submit">Préparer ma demande</button>
+        <p class="status" id="rdv-status" role="status" aria-live="polite"></p>
+      </form>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <p><b>Hélior</b> est une maison horlogère fictive, imaginée pour une démonstration FABRYA. La montre est un modèle 3D procédural : aucune photographie, aucune pièce réelle. Le formulaire ne transmet aucune donnée.</p>
+  <p class="foot-meta">Conception immersive · FABRYA</p>
+</footer>
+
+<div class="tags" id="tags" aria-hidden="true">
+  <div class="tag" data-anchor="glass"><b>Glace saphir</b><span>Bombée, traitée antireflet</span></div>
+  <div class="tag" data-anchor="bezel"><b>Lunette</b><span>Polie miroir</span></div>
+  <div class="tag" data-anchor="hands"><b>Aiguilles</b><span>Dauphine, facettées</span></div>
+  <div class="tag" data-anchor="dial"><b>Cadran</b><span>Index appliqués</span></div>
+  <div class="tag" data-anchor="bridges"><b>Ponts</b><span>Côtes de Genève</span></div>
+  <div class="tag" data-anchor="train"><b>Rouage</b><span>Roues dorées, 21 rubis</span></div>
+  <div class="tag" data-anchor="plate"><b>Platine</b><span>Perlée</span></div>
+  <div class="tag" data-anchor="case"><b>Carrure</b><span>Acier, 40 mm</span></div>
+  <div class="tag" data-anchor="back"><b>Fond</b><span>Saphir, vissé</span></div>
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
