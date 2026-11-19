@@ -1,0 +1,64 @@
+{
+  "cap_microusd": 2296000,
+  "remaining_microusd": 368354,
+  "provider_operations": [
+    {
+      "provider": "openai",
+      "operation": "cinema_plan",
+      "reserved_microusd": 208000,
+      "accounted_microusd": 25274,
+      "state": "usage_estimated",
+      "model": "gpt-6.1-sol",
+      "tokens": {
+        "input_tokens": 952,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cache_write_tokens_details": {
+            "ttl_12h_tokens": 0,
+            "ttl_30m_tokens": 0
+          },
+          "cached_tokens": 0
+        },
+        "output_tokens": 2337,
+        "output_tokens_details": {
+          "reasoning_tokens": 349
+        },
+        "total_tokens": 3289
+      }
+    },
+    {
+      "provider": "fal",
+      "operation": "video",
+      "reserved_microusd": 1880000,
+      "accounted_microusd": 1880000,
+      "state": "usage_estimated",
+      "endpoint": "kling/v4/text-to-video",
+      "transport": "connected_fal",
+      "basis": "configured published 1080p rate; compare with fal debit"
+    },
+    {
+      "provider": "openai",
+      "operation": "artistic_review",
+      "reserved_microusd": 208000,
+      "accounted_microusd": 22372,
+      "state": "usage_estimated",
+      "model": "gpt-6.1-sol",
+      "tokens": {
+        "input_tokens": 3176,
+        "input_tokens_details": {
+          "cache_write_tokens": 3173,
+          "cache_write_tokens_details": {
+            "ttl_12h_tokens": 0,
+            "ttl_30m_tokens": 3173
+          },
+          "cached_tokens": 0
+        },
+        "output_tokens": 1602,
+        "output_tokens_details": {
+          "reasoning_tokens": 500
+        },
+        "total_tokens": 4778
+      }
+    }
+  ]
+}

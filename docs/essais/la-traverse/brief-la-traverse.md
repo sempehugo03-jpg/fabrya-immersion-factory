@@ -1,0 +1,1 @@
+La Traverse est un atelier fictif de réparation de vélos du quotidien. Ses clients se déplacent en ville et veulent comprendre si leur vélo peut être remis en état. Le site doit les aider à identifier ce que l’atelier peut examiner et les inviter à préparer une demande de diagnostic. Aucun tarif, créneau, lieu physique ni coordonnées ne sont fournis.

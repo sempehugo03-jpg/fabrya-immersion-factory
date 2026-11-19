@@ -1,0 +1,38 @@
+{
+  "sources": [
+    {
+      "width": 1920,
+      "height": 1080,
+      "fps": 24.0,
+      "seconds": 8.041667,
+      "rotation": 0,
+      "sha256": "6cd828d85170e5eb9e9d03912f38369e4ae54936ac55b7326344ed2aeb129a7c"
+    }
+  ],
+  "master": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 24.0,
+    "seconds": 8.0,
+    "rotation": 0,
+    "sha256": "72bf7657b7e490e84fe5864bca7d0354ac7f6471060580251d2e2305cd9e1ef4"
+  },
+  "frames": 192,
+  "upscaled": false,
+  "interpolated": false,
+  "assembly_seconds": 21.45,
+  "native_definition": "Source dimensions verified. Capture/generation origin requires provenance.",
+  "temporal_checks": {
+    "freeze_min_seconds": 0.55,
+    "black_min_seconds": 0.2,
+    "sample_width": 320,
+    "freeze_intervals": [],
+    "black_intervals": []
+  },
+  "encode_seconds": 22.18,
+  "browser_bytes": {
+    "desktop": 4855688,
+    "mobile": 2932272
+  },
+  "total_web_bytes": 7855864
+}

@@ -1,0 +1,98 @@
+{
+  "brand": "La Traverse",
+  "audience": "Cyclistes du quotidien qui souhaitent comprendre si leur vélo peut être remis en état avant de préparer une demande de diagnostic.",
+  "goal": "Aider à décrire un problème observable et à préparer une demande de diagnostic, sans promettre de réparation ni simuler une prise de rendez-vous.",
+  "facts": [
+    "La Traverse est un atelier fictif de réparation de vélos du quotidien.",
+    "Aucune ressource visuelle autorisée n’est fournie.",
+    "Aucun tarif, créneau, lieu physique, contact ou identifiant de destination n’est disponible.",
+    "La route fal-text permet un plan généré depuis du texte, en 1080p, de 5 à 8 secondes.",
+    "Le plan retenu dure 8 secondes et coûte 1 880 000 microdollars, pour un budget disponible de 2 296 000."
+  ],
+  "unknowns": [
+    "Le périmètre précis des diagnostics et réparations proposés.",
+    "Les types de vélos et équipements acceptés.",
+    "L’état du vélo du visiteur et la possibilité effective de le réparer.",
+    "Le canal par lequel une demande pourra être transmise."
+  ],
+  "concepts": [
+    {
+      "name": "Suivre ce qui tourne",
+      "entry": "Une roue arrière tourne doucement, cadrée près de sa bande de roulement.",
+      "discovery": "Un déplacement latéral et descendant révèle la chaîne, les pignons et la main qui entraîne doucement le pédalier.",
+      "tradeoff": "Une lecture mécanique claire, mais volontairement limitée à une partie du vélo : ce n’est pas une présentation exhaustive des interventions."
+    },
+    {
+      "name": "Le geste qui hésite",
+      "entry": "Une personne fait avancer son vélo à la main, puis s’arrête.",
+      "discovery": "La caméra accompagne son regard vers une roue, transformant une gêne quotidienne en question à décrire.",
+      "tradeoff": "Une identification immédiate au cycliste, mais un risque de suggérer une panne précise ou un lieu d’accueil non documenté."
+    },
+    {
+      "name": "Préparer son regard",
+      "entry": "Une main tient un téléphone sans interface lisible près d’un vélo immobile.",
+      "discovery": "La caméra contourne le téléphone et révèle le détail mécanique que la personne cherche à photographier.",
+      "tradeoff": "Un lien direct avec la préparation d’une demande, mais le téléphone détourne une partie de l’attention du vélo."
+    }
+  ],
+  "selected": 0,
+  "rationale": "Le premier concept rend l’observation concrète sans inventer de panne ni de résultat. Le mouvement relie des éléments visibles et donne un sens au défilement réversible. Un seul plan évite les problèmes de raccord et conserve une continuité mécanique lisible.",
+  "visual_bible": "Illustration générée d’un atelier fictif, jamais présentée comme une photographie de La Traverse. Vélo urbain sans marque, cadre bleu ardoise mat, pneu noir légèrement poussiéreux, transmission métallique sobre. Fond de travail neutre et flou, sans enseigne ni adresse. Lumière latérale douce, couleurs naturelles, contraste modéré ; aucun effet spectaculaire ni avant/après. Une seule main, manche écrue sans logo, entraîne lentement le pédalier. La roue, la chaîne et le pédalier restent mécaniquement cohérents. Le sujet utile reste dans la bande horizontale centrale comprise entre x=0,30 et x=0,70, compatible avec un recadrage 4:5 fixe centré. Textes et boutons ajoutés par l’interface, jamais générés dans la vidéo. Ton éditorial français, concret et prudent : observer, décrire, faire examiner ; aucune garantie de remise en état.",
+  "description": "Un bruit, une roue qui gêne, une chaîne qui saute ? Repérez ce que vous observez, puis préparez les informations utiles pour demander un diagnostic. La possibilité d’une réparation reste à confirmer après examen.",
+  "shots": [
+    {
+      "route": "fal-text",
+      "asset_id": "",
+      "seconds": 8,
+      "trim_start": 0,
+      "resolution": "1080p",
+      "movement": "Travelling latéral court avec une légère descente et un petit arc autour de la roue arrière ; mouvement continu, sans zoom, ralenti en fin de parcours.",
+      "video_prompt": "Un seul plan cinématographique continu de 8 secondes, sans coupe, en 1080p, format horizontal. Scène illustrative dans un espace de travail fictif neutre, sans enseigne, sans marque, sans texte. Un vélo urbain bleu ardoise mat est maintenu sur un support discret, roue arrière légèrement surélevée. Lumière latérale douce, matières réalistes, fond sobre et flou. Au début, vue rapprochée oblique de la partie basse de la roue arrière : le pneu et les rayons tournent lentement et régulièrement. De 0 à 3 secondes, la caméra commence un travelling latéral doux d’environ trente centimètres, légèrement descendant, avec un petit arc qui fait apparaître les pignons derrière les rayons ; véritable parallaxe du décor, aucun zoom. De 3 à 6 secondes, le déplacement révèle progressivement la chaîne en mouvement et une main à manche écrue qui entraîne doucement le pédalier. La roue tourne parce que le pédalier entraîne réellement la chaîne et les pignons : proportions et mécanique cohérentes, aucun élément qui se transforme. Le détail à découvrir est le chemin continu de la chaîne entre le plateau et les pignons. De 6 à 8 secondes, le mouvement de caméra ralentit jusqu’à une composition presque stable où la chaîne, les pignons et une partie du pédalier sont lisibles ; la main poursuit sa rotation lente, sans démonstration de réparation. Aucun dommage spectaculaire, aucune pièce remplacée, aucune validation technique suggérée. Préserver les détails utiles dans les 40 pour cent centraux de la largeur pendant tout le plan, pour un recadrage vertical 4:5 fixe centré. Rythme calme, continuité absolue de la lumière, du vélo, de la main et de la rotation. Aucune transition, aucun fondu, aucun écran ni texte incrusté.",
+      "reference_prompt": "",
+      "raccord": "Aucune coupe. La rotation de la roue et le trajet visible de la chaîne motivent le déplacement de caméra. La progression suit directement la position de lecture : en revenant au scroll, le même parcours se rembobine sans transition supplémentaire.",
+      "rationale": "La découverte passe d’un symptôme que l’on pourrait observer à des éléments que l’on peut nommer. Le mouvement réel du vélo et la parallaxe évitent l’effet diaporama, sans prétendre établir un diagnostic."
+    }
+  ],
+  "mobile_center": 0.5,
+  "actions": [
+    {
+      "id": "observer",
+      "label": "Quoi observer sur mon vélo ?",
+      "heading": "Décrire avant de conclure",
+      "body": "Repérez la zone concernée : roues et pneus, freinage, pédalage et transmission, direction ou éclairage. Notez ce que vous constatez : bruit, frottement, jeu, blocage ou fonctionnement irrégulier. Ces repères aident à formuler votre demande ; ils ne confirment ni une panne ni une intervention proposée par La Traverse. Ne provoquez pas un problème pour le montrer et ne roulez pas si vous doutez de la sécurité du vélo.",
+      "destination_id": ""
+    },
+    {
+      "id": "preparer",
+      "label": "Préparer ma demande",
+      "heading": "Les informations utiles au diagnostic",
+      "body": "Préparez une courte description du vélo, la zone concernée, le symptôme et les circonstances où il apparaît. Précisez depuis quand vous l’observez et tout choc ou changement récent. Si possible, prenez une vue d’ensemble et une photo du détail concerné, vélo à l’arrêt. La possibilité d’une réparation devra être confirmée après examen. Aucun canal d’envoi n’est encore renseigné sur cette démonstration.",
+      "destination_id": ""
+    },
+    {
+      "id": "limites",
+      "label": "Ce qui reste à confirmer",
+      "heading": "Avant toute intervention",
+      "body": "Le périmètre des interventions, la compatibilité de votre vélo, les modalités de diagnostic, les tarifs et les disponibilités ne sont pas renseignés. Cette page vous aide à préparer votre demande ; elle ne constitue ni un devis ni une réservation.",
+      "destination_id": ""
+    }
+  ],
+  "hotspots": [
+    {
+      "action_id": "observer",
+      "shot": 0,
+      "start": 1,
+      "end": 2.8,
+      "x": 0.5,
+      "y": 0.7
+    },
+    {
+      "action_id": "preparer",
+      "shot": 0,
+      "start": 6.2,
+      "end": 8,
+      "x": 0.5,
+      "y": 0.76
+    }
+  ]
+}

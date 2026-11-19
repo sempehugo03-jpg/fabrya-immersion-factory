@@ -1,0 +1,58 @@
+{
+  "axes": [
+    {
+      "axis": "photoréalisme",
+      "grade": "PASS",
+      "evidence": "Plan 1, de 0,24 à 7,68 s : reflets modérés sur les tubes, texture du pneu, métal de la chaîne et plis de la manche crédibles. La lumière douce et le fond d’atelier restent visuellement plausibles, sans rendu schématique.",
+      "fix": ""
+    },
+    {
+      "axis": "composition",
+      "grade": "REVISE",
+      "evidence": "Plan 1, à 4,00 puis 7,68 s : la transmission se lit en horizontal, mais le moyeu arrière est à gauche de la bande centrale prévue et le pédalier déborde à droite. Un recadrage 4:5 fixe centré couperait les deux extrémités du trajet mécanique que le film veut expliquer.",
+      "fix": "Reculer la caméra et orienter davantage le vélo en profondeur pour conserver moyeu, chaîne et axe du pédalier dans le recadrage vertical. Contrôler ce cadrage sur toute la trajectoire, notamment entre 4 et 8 s."
+    },
+    {
+      "axis": "cohérence des objets",
+      "grade": "UNVERIFIED",
+      "evidence": "Plan 1, de 2,00 à 7,68 s : le cadre, la roue et le plateau restent reconnaissables, mais les éléments arrière sont superposés et sombres. Ces vues ne permettent pas de valider l’engrènement de la chaîne, son guidage arrière ni la liaison mécanique entre le geste et la rotation.",
+      "fix": "Prévoir une vue légèrement plus dégagée et éclairée de la transmission côté entraînement, montrant le passage de chaîne sur les pignons et son éventuel dispositif de tension."
+    },
+    {
+      "axis": "stabilité temporelle",
+      "grade": "UNVERIFIED",
+      "evidence": "Plan 1 : les cinq images entre 0,24 et 7,68 s conservent une apparence générale proche, mais leurs intervalles ne permettent pas de détecter les scintillements, les déformations de rayons ou les sauts de chaîne et de doigts.",
+      "fix": "Examiner le plan intégral à vitesse normale puis image par image, particulièrement entre 4 et 7,68 s lorsque la main et les manivelles deviennent visibles."
+    },
+    {
+      "axis": "continuité des plans",
+      "grade": "PASS",
+      "evidence": "Plan 1, de 0,24 à 7,68 s : le même vélo bleu, le garde-boue noir et le fond gris accompagnent une découverte progressive du pédalier. Aucun changement de décor, d’éclairage ou raccord discordant n’est apparent dans les images fournies.",
+      "fix": ""
+    },
+    {
+      "axis": "mouvement spatial",
+      "grade": "UNVERIFIED",
+      "evidence": "Plan 1, de 0,24 à 4,00 s : le cadrage descend et découvre le pédalier ; de 6,00 à 7,68 s, il paraît presque stabilisé. Le fond peu détaillé ne fournit toutefois pas de parallaxe suffisamment identifiable pour confirmer un travelling avec arc plutôt qu’un simple déplacement du cadrage.",
+      "fix": "Introduire un repère discret au second plan et réaliser un déplacement latéral produisant une occultation différentielle visible derrière les rayons, sans agrandissement numérique."
+    },
+    {
+      "axis": "netteté",
+      "grade": "PASS",
+      "evidence": "Plan 1, à 2,00 et 4,00 s : les maillons, les contours du plateau et les tubes sont discernables. À 7,68 s, la main et la manivelle restent lisibles ; le flou du fond ne masque pas le sujet principal dans les vues horizontales fournies.",
+      "fix": ""
+    },
+    {
+      "axis": "pertinence commerciale",
+      "grade": "PASS",
+      "evidence": "Plan 1, de 0,24 à 7,68 s : le passage de la roue à la transmission donne un support concret à l’observation d’un vélo du quotidien. Aucun prix, résultat de réparation, adresse ou rendez-vous n’est affiché. Le geste montré relève de la manipulation, sans avant/après ni réparation prétendument réussie.",
+      "fix": ""
+    }
+  ],
+  "limitations": [
+    "L’inspection porte sur cinq images chronologiques, pas sur la lecture continue du film ; la stabilité du mouvement entre ces images reste inconnue.",
+    "Les vues ne prouvent ni la rotation mécaniquement correcte de la transmission ni la parallaxe annoncée dans le plan.",
+    "Aucun rendu mobile ni aucune interface avec textes, boutons ou zones interactives n’est montré. Leur lisibilité et leur fonctionnement ne sont donc pas validés.",
+    "La pertinence du sujet ne démontre aucun résultat commercial ni aucune capacité effective de diagnostic ou de réparation."
+  ]
+}
