@@ -21,18 +21,18 @@ jobs:
           printf '%s' 'Tu es un horloger et tu dois me créer un putain de site immersif.' > run/brief.txt
           curl -fL --retry 2 -o "$RUNNER_TEMP/llama.tar.gz" https://github.com/ggml-org/llama.cpp/releases/download/b12532/llama-b12532-bin-ubuntu-x64.tar.gz
           tar -xzf "$RUNNER_TEMP/llama.tar.gz" -C "$RUNNER_TEMP"
-          curl -fL --retry 2 -o "$RUNNER_TEMP/model.gguf" https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF/resolve/main/Qwen2.5-7B-Instruct-Q4_K_M.gguf
+          curl -fL --retry 2 -o "$RUNNER_TEMP/model.gguf" https://huggingface.co/bartowski/Qwen_Qwen3-4B-Instruct-2507-GGUF/resolve/ae44f08e1392f39c0e474af10c3ff8355c8b6688/Qwen_Qwen3-4B-Instruct-2507-Q4_K_M.gguf
           npm install --no-save playwright@1.58.0
           server=$(find "$RUNNER_TEMP" -name llama-server -type f -print -quit)
-          "$server" -m "$RUNNER_TEMP/model.gguf" --alias fabrya-qwen25-7b --host 127.0.0.1 --port 18222 -c 12288 -t 4 -tb 4 -np 1 --no-warmup > run/llama.log 2>&1 &
+          "$server" -m "$RUNNER_TEMP/model.gguf" --alias fabrya-qwen3-4b --host 127.0.0.1 --port 18222 -c 12288 -t 4 -tb 4 -np 1 --no-warmup > run/llama.log 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid" 2>/dev/null || true' EXIT
           for attempt in $(seq 1 45); do
             if curl -fsS http://127.0.0.1:18222/health >/dev/null; then break; fi
             sleep 2
           done
-          python3 scripts/explore-local-json.py explore run/brief.txt --out run/exploration --local-url http://127.0.0.1:18222 --local-model fabrya-qwen25-7b --production-cap-microusd 0
-          python3 scripts/realize-exploration.py --exploration run/exploration --brief run/brief.txt --evidence run/production --site run/website/index.html --port 18222 --model fabrya-qwen25-7b
+          FABRYA_FAST_JSON=1 python3 scripts/explore-local-json.py explore run/brief.txt --out run/exploration --local-url http://127.0.0.1:18222 --local-model fabrya-qwen3-4b --production-cap-microusd 0
+          python3 scripts/realize-exploration.py --exploration run/exploration --brief run/brief.txt --evidence run/production --site run/website/index.html --port 18222 --model fabrya-qwen3-4b
           export FABRYA_BROWSER_PATH
           FABRYA_BROWSER_PATH=$(command -v google-chrome)
           node scripts/inspect-exploration-browser.cjs run/website/index.html run/browser-initial
@@ -49,7 +49,7 @@ jobs:
           Path("run/browser-review-input.json").write_text(json.dumps(evidence, ensure_ascii=False))
           PYTHON
           cp run/website/index.html run/production/premier-rendu.html
-          if python3 scripts/realize-exploration.py --exploration run/exploration --brief run/brief.txt --evidence run/production --site run/website/index.html --port 18222 --model fabrya-qwen25-7b --review run/browser-review-input.json; then
+          if python3 scripts/realize-exploration.py --exploration run/exploration --brief run/brief.txt --evidence run/production --site run/website/index.html --port 18222 --model fabrya-qwen3-4b --review run/browser-review-input.json; then
             printf '%s\n' applied > run/production/review-status.txt
           else
             printf '%s\n' failed > run/production/review-status.txt
