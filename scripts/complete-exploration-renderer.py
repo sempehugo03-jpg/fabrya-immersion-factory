@@ -42,10 +42,27 @@ def main(args):
             "background": "#050505", "light_text": "#f0f0f0", "gold": "#d4af37", "steel": "#bdc3c7",
         },
     }
+    instructions = RENDER
+    if args.raster:
+        context["asset"] = {
+            "path": "watch.webp",
+            "width": 1000,
+            "height": 945,
+            "alpha": True,
+            "description": "Rendu original de la montre complète généré depuis la vision de FABRYA."
+        }
+        instructions += (
+            "\nLe média de la montre est maintenant fourni. Charge watch.webp et dessine réellement cette image"
+            " sur la surface du canvas au chargement, puis redessine à chaque commande."
+            " Le canvas doit être dimensionné dès le premier rendu et rester utilisable au toucher."
+            " Chaque configuration doit produire une variation effectivement visible du média."
+            " Ton code choisit librement comment représenter chacune des modifications de la vision à partir de cette image."
+            " N'introduis aucun texte de produit réel. Garde le dessin visible avec les contrôles existants."
+        )
     request = {
         "model": args.model, "temperature": 0.55, "seed": 43,
         "repeat_penalty": 1.10, "repeat_last_n": 192, "max_tokens": 2450,
-        "messages": [{"role": "system", "content": RENDER},
+        "messages": [{"role": "system", "content": instructions},
                      {"role": "user", "content": json.dumps(context, ensure_ascii=False)}],
     }
     (args.evidence / "renderer-request.json").write_text(json.dumps(request, ensure_ascii=False, indent=2))
@@ -74,6 +91,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("vision", "brief", "markup", "evidence", "website"):
         parser.add_argument(f"--{name}", type=Path, required=True)
+    parser.add_argument("--raster", action="store_true")
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--model", required=True)
     main(parser.parse_args())
