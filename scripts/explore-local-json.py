@@ -37,6 +37,28 @@ def unique_fields(pairs):
 
 def local_json_speaker(url, model):
     def speak(run, stage, instructions, schema, content):
+        resume_path = os.environ.get("FABRYA_RESUME_STAGES")
+        if resume_path and stage in {"unrestricted_exploration", "artistic_selection", "unrestricted_realization"}:
+            original = Path(resume_path)
+            request_name = f"{stage}-request.json"
+            if (original / request_name).read_bytes() != (run.directory / request_name).read_bytes():
+                raise Rejected("Archived stage request does not match")
+            raw = (original / f"{stage}.json").read_bytes()
+            output = json.loads(raw)
+            validate(schema, output)
+            for path in original.glob(f"{stage}-transport-*.json"):
+                (run.directory / path.name).write_bytes(path.read_bytes())
+            run.record("model_inference", "replayed_verified_response", model=model, phase=stage,
+                       response_sha256=hashlib.sha256(raw).hexdigest(), charged_microusd=0)
+            if stage == "unrestricted_realization":
+                (run.directory / f"{stage}-original.json").write_bytes(raw)
+                brief = (Path(os.environ["FABRYA_RESUME_BRIEF"]).read_text()).strip()
+                claimed = output["confirmed_facts"]
+                output["confirmed_facts"] = [fact for fact in claimed if fact.strip() and fact in brief]
+                if output["confirmed_facts"] != claimed:
+                    run.record("factual_metadata_validation", "filtered_unquoted_claims",
+                               removed_count=len(claimed) - len(output["confirmed_facts"]))
+            return output
         preserved = os.environ.get("FABRYA_REUSE_EXPLORATION")
         if stage == "unrestricted_exploration" and preserved:
             original = Path(preserved)
