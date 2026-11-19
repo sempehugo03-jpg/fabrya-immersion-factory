@@ -1,0 +1,68 @@
+{
+  "controls": [
+    {
+      "key": "clockType",
+      "label": "TYPE DE MONTRE",
+      "choices": [
+        {
+          "value": "quartz",
+          "label": "QUARTZ (PRÉCISION)"
+        },
+        {
+          "value": "mechanique",
+          "label": "MÉCANIQUE (ARTISANAL)"
+        }
+      ]
+    },
+    {
+      "key": "material",
+      "label": "MATÉRIAU BOÎTIER",
+      "choices": [
+        {
+          "value": "acier",
+          "label": "ACIER INOXYDABLE"
+        },
+        {
+          "value": "or",
+          "label": "OR 18K"
+        }
+      ]
+    },
+    {
+      "key": "bracelet",
+      "label": "BRACELET",
+      "choices": [
+        {
+          "value": "non",
+          "label": "SANS BRACELET"
+        },
+        {
+          "value": "acier",
+          "label": "BRACELET ACIER"
+        },
+        {
+          "value": "or",
+          "label": "BRACELET OR"
+        }
+      ]
+    },
+    {
+      "key": "color",
+      "label": "COULEUR DIAL",
+      "choices": [
+        {
+          "value": "noir",
+          "label": "NOIR PROFOND"
+        },
+        {
+          "value": "blanc",
+          "label": "BLANC ÉBÈNE"
+        },
+        {
+          "value": "rouge",
+          "label": "ROUGE SANG"
+        }
+      ]
+    }
+  ]
+}
