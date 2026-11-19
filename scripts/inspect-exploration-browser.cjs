@@ -83,6 +83,22 @@ async function inspect(browser, name, config) {
       issues.push('Interaction ' + (label || i) + ': ' + error.message.split('\n')[0]);
     }
   }
+  const selects = page.locator('select:visible');
+  for (let i = 0, count = Math.min(await selects.count(), 5); i < count; i++) {
+    try {
+      const select = selects.nth(i);
+      const currentValue = await select.inputValue();
+      const options = await select.locator('option:not([disabled])').evaluateAll(items => items.map(option => option.value));
+      const alternate = options.find(value => value !== currentValue);
+      if (alternate !== undefined) {
+        await select.selectOption(alternate);
+        await pause(480);
+        steps['choix ' + i + ' ' + alternate] = await state();
+      }
+    } catch (error) {
+      issues.push('Select ' + i + ': ' + error.message.split('\n')[0]);
+    }
+  }
   const range = page.locator('input[type=range]:visible').first();
   if (await range.count()) {
     await range.focus();
