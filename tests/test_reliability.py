@@ -224,3 +224,12 @@ class KnownVisualDefects(unittest.TestCase):
         report = {"axes": [{"axis": "composition", "grade": "PASS"}], "diagnoses": []}
         with self.assertRaisesRegex(Rejected, "does not match"):
             ground_review(raw, report, self.rows, [])
+
+
+    def test_low_confidence_never_grants_visual_acceptance(self):
+        row = self.rows[0]
+        raw = {"axes": {"netteté": {"shot": 0, "time": row["time"], "confidence": "low",
+                                   "frames": [row["id"]]}}}
+        report = {"axes": [{"axis": "netteté", "grade": "PASS", "evidence": "Image lointaine."}],
+                  "diagnoses": []}
+        self.assertEqual(ground_review(raw, report, self.rows, [])["axes"][0]["grade"], "UNVERIFIED")

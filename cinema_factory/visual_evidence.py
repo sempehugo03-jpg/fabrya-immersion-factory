@@ -84,13 +84,13 @@ def check_evidence(rows, plan, directory, metadata, crop, left, observations=Non
                 raise Rejected("Measured subject observation is outside the normalized source")
             width = metadata["width"]
             inside = max(0, min(x1, (left+crop)/width)-max(x0, left/width))/(x1-x0)
-            if inside < .95 or visibility < .8:
-                clipped = inside < .95
-                defects.append(dict(axis="composition" if clipped else "cohérence des objets",
-                    code="mobile_crop_subject" if clipped else "occluded_subject",
-                    evidence_id=row["id"], shot=row["shot"], time=row["time"],
-                    scope="reframe" if clipped else "stop", confidence="high",
-                    detail=f'{item["subject"]} · {inside:.0%} dans le cadre, {visibility:.0%} visible dans la source.'))
+            detail = f'{item["subject"]} · {inside:.0%} dans le cadre, {visibility:.0%} visible dans la source.'
+            common = dict(evidence_id=row["id"], shot=row["shot"], time=row["time"],
+                          confidence="high", detail=detail)
+            if inside < .95:
+                defects.append(dict(axis="composition", code="mobile_crop_subject", scope="reframe", **common))
+            if visibility < .8:
+                defects.append(dict(axis="cohérence des objets", code="occluded_subject", scope="stop", **common))
     return defects
 
 
@@ -107,6 +107,10 @@ def ground_review(raw, report, frames, defects):
         if not any(math.isclose(row["time"] if shot != -1 else row["frame"]/FPS, time, abs_tol=.05)
                    and (shot == -1 or shot == row["shot"]) for row in cited):
             raise Rejected("Visual opinion does not match the cited shot and position")
+        if result["grade"] == "PASS" and authored.get("confidence") == "low":
+            result.update(grade="UNVERIFIED", fix="Reprendre l’observation avec des images probantes.")
+            report["diagnoses"].append(dict(axis=axis, shot=shot, time=time,
+                evidence=result["evidence"], scope="stop", confidence="low", correction=result["fix"]))
         if result["grade"] == "PASS" and axis in ("composition", "cohérence des objets"):
             profile_pairs = {(r["shot"], r["frame"], r["profile"]) for r in cited}
             matched = any((s, f, "desktop") in profile_pairs and (s, f, "mobile") in profile_pairs
