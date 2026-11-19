@@ -82,7 +82,7 @@ async function inspect(browser, name, config) {
     }
   }
   await sampleMedia('reference');
-  const buttons = page.locator('button:visible');
+  const buttons = page.locator('button:visible:enabled');
   const clickCount = Math.min(await buttons.count(), 6);
   for (let i = 0; i < clickCount; i++) {
     const button = buttons.nth(i);
