@@ -17,6 +17,13 @@ le défilement est lissé comme une couronne sous le pouce et fait avancer un se
 | V · Cadrans | Trois cadrans dessinés en temps réel (bleu nuit soleillé, émail grand feu, ardoise guillochée) |
 | VI · Rendez-vous | Remontage complet, retour à l'heure exacte, formulaire local |
 
+Rendu : HDRI de studio (CC0, Poly Haven via @pmndrs/assets) mêlé à des softbox procédurales, cadran soleillé anisotrope,
+relief perlage / Côtes de Genève, ombres douces, occlusion ambiante (GTAO), glace saphir réfractive, focale variable par plan,
+profondeur de champ, bloom, étalonnage (grain, vignettage, frange chromatique). Qualité adaptative : la résolution et les
+effets baissent automatiquement si la machine ne tient pas ~45 i/s ; `?hq` force la qualité maximale.
+
+Mouvement : défilement inertiel à la molette, ressort amorti sur la timeline, intro avec balayage de lumière, caméra « à l'épaule ».
+
 Détails : petite seconde qui avance par huitièmes (28 800 alt/h), son d'échappement optionnel (bouton « Battement »),
 parallaxe à la souris, `prefers-reduced-motion` respecté (aucun lissage, mouvement figé), repli lisible sans WebGL.
 

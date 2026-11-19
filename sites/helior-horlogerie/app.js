@@ -9,6 +9,8 @@ import { RenderPass } from './vendor/addons/postprocessing/RenderPass.js';
 import { BokehPass } from './vendor/addons/postprocessing/BokehPass.js';
 import { UnrealBloomPass } from './vendor/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from './vendor/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from './vendor/addons/postprocessing/ShaderPass.js';
+import { GTAOPass } from './vendor/addons/postprocessing/GTAOPass.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -45,6 +47,23 @@ measure();
 addEventListener('resize', measure);
 addEventListener('load', measure);
 if (document.fonts) document.fonts.ready.then(measure);
+
+/* ---------- inertial wheel scrolling: the page glides like a crown under the thumb ---------- */
+let wheelTarget = scrollY, wheelActive = false;
+addEventListener('wheel', (e) => {
+  if (reduceMQ.matches || e.ctrlKey || mobileMQ.matches) return;
+  e.preventDefault();
+  const unit = e.deltaMode === 1 ? 32 : e.deltaMode === 2 ? innerHeight : 1;
+  if (!wheelActive) wheelTarget = scrollY;
+  wheelTarget = clamp(wheelTarget + e.deltaY * unit, 0, document.documentElement.scrollHeight - innerHeight);
+  wheelActive = true;
+}, { passive: false });
+['keydown', 'pointerdown', 'touchstart'].forEach((ev) => addEventListener(ev, () => { wheelActive = false; }, { passive: true }));
+function stepWheel(dt) {
+  if (!wheelActive) return;
+  const y = scrollY + (wheelTarget - scrollY) * (1 - Math.exp(-dt * 7.5));
+  if (Math.abs(wheelTarget - y) < 0.6) { scrollTo(0, wheelTarget); wheelActive = false; } else scrollTo(0, y);
+}
 
 const navLinks = $$('[data-nav]');
 navLinks.forEach((a) => a.addEventListener('click', (e) => {
@@ -157,7 +176,8 @@ try {
 if (!renderer) {
   document.documentElement.classList.add('no-webgl');
   loader.classList.add('done');
-  const loop = () => { updateChrome(scrollT()); requestAnimationFrame(loop); };
+  let lt = performance.now();
+  const loop = (now) => { stepWheel(Math.min(0.1, (now - lt) / 1000)); lt = now; updateChrome(scrollT()); requestAnimationFrame(loop); };
   requestAnimationFrame(loop);
 } else {
   buildStage(renderer);
@@ -167,16 +187,21 @@ function buildStage(renderer) {
   renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.NeutralToneMapping;
-  renderer.toneMappingExposure = 1.0;
+  renderer.toneMappingExposure = 0.9;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   const scene = new THREE.Scene();
   const pmrem = new THREE.PMREMGenerator(renderer);
   // photo studio: black room, softboxes and strip lights, so polished steel reads as it does in a product shot
-  function studioEnvironment() {
+  function studioEnvironment(hdr) {
     const env = new THREE.Scene();
     env.background = new THREE.Color(0x010203);
+    if (hdr) {
+      const dome = new THREE.Mesh(new THREE.SphereGeometry(80, 64, 32), new THREE.MeshBasicMaterial({ map: hdr, side: THREE.BackSide, color: new THREE.Color().setScalar(0.22) }));
+      dome.rotation.y = 1.2;
+      env.add(dome);
+    }
     const panel = (w, h, x, y, z, intensity, color = 0xffffff) => {
       const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(intensity), side: THREE.DoubleSide }));
       m.position.set(x, y, z); m.lookAt(0, 0, 0); env.add(m);
@@ -192,6 +217,20 @@ function buildStage(renderer) {
   }
   scene.environment = pmrem.fromScene(studioEnvironment(), 0.015).texture;
   scene.environmentIntensity = 1.0;
+  // a real photographed studio (CC0 HDRI) blended with the softboxes, loaded after first paint
+  Promise.all([import('./vendor/studio-hdri.js'), import('./vendor/addons/loaders/EXRLoader.js')]).then(([hdri, { EXRLoader }]) => {
+    const bin = atob(hdri.default.split(',')[1]);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const loader = new EXRLoader(); loader.setDataType(THREE.HalfFloatType);
+    const d = loader.parse(bytes.buffer);
+    const tex = new THREE.DataTexture(d.data, d.width, d.height, d.format, d.type);
+    tex.colorSpace = THREE.LinearSRGBColorSpace;
+    tex.minFilter = tex.magFilter = THREE.LinearFilter; tex.generateMipmaps = false; tex.flipY = false; tex.needsUpdate = true;
+    const old = scene.environment;
+    scene.environment = pmrem.fromScene(studioEnvironment(tex), 0.015).texture;
+    old.dispose(); tex.dispose();
+  }).catch(() => {});
   {
     const c = document.createElement('canvas'); c.width = 64; c.height = 1024;
     const g2 = c.getContext('2d');
@@ -394,7 +433,8 @@ function buildStage(renderer) {
   }
 
   let currentDial = 'nuit';
-  const dialTex = canvasTexture(2048, (ctx, s) => drawDial(ctx, s, DIALS[currentDial]));
+  const DIAL_RES = renderer.capabilities.maxTextureSize >= 4096 && !mobileMQ.matches ? 4096 : 2048;
+  const dialTex = canvasTexture(DIAL_RES, (ctx, s) => drawDial(ctx, s, DIALS[currentDial]));
 
   const grainTex = canvasTexture(512, (ctx, s) => {
     const img = ctx.createImageData(s, s);
@@ -426,10 +466,10 @@ function buildStage(renderer) {
     gilt: new THREE.MeshPhysicalMaterial({ color: 0xd8b26a, metalness: 1, roughness: 0.3 }),
     blued: new THREE.MeshPhysicalMaterial({ color: 0x2c55c4, metalness: 0.85, roughness: 0.22, clearcoat: 0.8, clearcoatRoughness: 0.1 }),
     ruby: new THREE.MeshPhysicalMaterial({ color: 0xb0102e, metalness: 0, roughness: 0.04, clearcoat: 1, emissive: 0x2a0008 }),
-    glass: new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 0, roughness: 0.0, transmission: 1, thickness: 1.4, ior: 1.77, specularIntensity: 1, attenuationColor: 0xe8f0ff, attenuationDistance: 40 }),
+    glass: new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 0, roughness: 0.0, transmission: 1, thickness: 1.4, ior: 1.77, specularIntensity: 0.4, attenuationColor: 0xe8f0ff, attenuationDistance: 40 }),
     backGlass: new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 0, roughness: 0.02, transmission: 1, thickness: 0.5, ior: 1.77 }),
     bridge: new THREE.MeshPhysicalMaterial({ color: 0xffffff, map: cotesTex, bumpMap: cotesTex, bumpScale: 0.6, metalness: 1, roughness: 0.22, anisotropy: 0.6, anisotropyRotation: Math.PI / 2 - 0.62 }),
-    plate: new THREE.MeshPhysicalMaterial({ color: 0xc4c9d0, map: perlageTex, bumpMap: perlageTex, bumpScale: 0.5, metalness: 1, roughness: 0.3 }),
+    plate: new THREE.MeshPhysicalMaterial({ color: 0xa7adb5, map: perlageTex, bumpMap: perlageTex, bumpScale: 0.5, metalness: 1, roughness: 0.3 }),
     ratchet: new THREE.MeshPhysicalMaterial({ color: 0xffffff, map: sunburstSteelTex, metalness: 1, roughness: 0.18 }),
     leather: new THREE.MeshPhysicalMaterial({ color: 0x2a1910, bumpMap: grainTex, bumpScale: 2.5, roughnessMap: grainTex, roughness: 0.75, metalness: 0, sheen: 1, sheenColor: 0x6e4c34, sheenRoughness: 0.5, clearcoat: 0.15, side: THREE.DoubleSide }),
     stitch: new THREE.MeshStandardMaterial({ color: 0xd8c7a4, roughness: 0.8 }),
@@ -862,13 +902,13 @@ function buildStage(renderer) {
      (fraction of the viewport; d = desktop, m = phone), e: exploded view,
      e2: upper layers slid aside to reveal the movement. */
   const K = [
-    { rot: [0.0, 0.0, 0.0], look: [0, 0, 0], dist: 158, d: [0.2, 0], m: [0, 0.21], e: 0, e2: 0, dof: 0.00002 },
-    { rot: [-0.32, -1.08, 0.08], look: [6, 0, 0], dist: 112, d: [0.21, 0], m: [0, 0.21], e: 0, e2: 0, dof: 0.00022 },
-    { rot: [-0.98, -0.6, 0.45], look: [0, 0, -1], dist: 250, d: [0.17, 0], m: [-0.04, 0.19], e: 1, e2: 0, dof: 0.00008 },
-    { rot: [-0.18, 0.22, 0.05], look: [-7.6, -6.4, -2], dist: 78, d: [0.21, 0], m: [0, 0.21], e: 1, e2: 1, dof: 0.00045 },
-    { rot: [-0.62, 0.42, 0.3], look: [3, 1, -2], dist: 98, d: [0.25, 0], m: [0, 0.21], e: 0.3, e2: 1, dof: 0.00028 },
-    { rot: [0.0, 0.0, 0.0], look: [0, 0, 0], dist: 150, d: [0.2, 0], m: [0, 0.21], e: 0, e2: 0, dof: 0.00002 },
-    { rot: [0.18, 0.55, -0.12], look: [0, 0, 0], dist: 165, d: [-0.22, 0], m: [0, 0.24], e: 0, e2: 0, dof: 0.0001 },
+    { rot: [0.0, 0.0, 0.0], look: [0, 0, 0], dist: 158, d: [0.2, 0], m: [0, 0.21], e: 0, e2: 0, dof: 0.00002, fov: 17 },
+    { rot: [-0.32, -1.08, 0.08], look: [6, 0, 0], dist: 112, d: [0.21, 0], m: [0, 0.21], e: 0, e2: 0, dof: 0.0001, fov: 21 },
+    { rot: [-0.98, -0.6, 0.45], look: [0, 0, -1], dist: 250, d: [0.17, 0], m: [-0.04, 0.19], e: 1, e2: 0, dof: 0.00008, fov: 24 },
+    { rot: [-0.18, 0.22, 0.05], look: [-7.6, -6.4, -2], dist: 78, d: [0.21, 0], m: [0, 0.21], e: 1, e2: 1, dof: 0.00032, fov: 34 },
+    { rot: [-0.62, 0.42, 0.3], look: [3, 1, -2], dist: 98, d: [0.25, 0], m: [0, 0.21], e: 0.3, e2: 1, dof: 0.00028, fov: 28 },
+    { rot: [0.0, 0.0, 0.0], look: [0, 0, 0], dist: 150, d: [0.2, 0], m: [0, 0.21], e: 0, e2: 0, dof: 0.00002, fov: 17 },
+    { rot: [0.18, 0.55, -0.12], look: [0, 0, 0], dist: 165, d: [-0.22, 0], m: [0, 0.24], e: 0, e2: 0, dof: 0.00004, fov: 20 },
   ];
 
   /* ---------------- shadows ---------------- */
@@ -883,26 +923,87 @@ function buildStage(renderer) {
   const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
   const composer = new EffectComposer(renderer, rt);
   composer.addPass(new RenderPass(scene, camera));
+  // sanitize HDR: a single NaN/Inf specular sample would otherwise smear through the bloom mips
+  composer.addPass(new ShaderPass({
+    uniforms: { tDiffuse: { value: null } },
+    vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `uniform sampler2D tDiffuse; varying vec2 vUv;
+      void main(){ vec4 c = texture2D(tDiffuse, vUv);
+        if (any(isnan(c.rgb)) || any(isinf(c.rgb))) c.rgb = vec3(0.0);
+        gl_FragColor = vec4(clamp(c.rgb, 0.0, 40.0), 1.0); }`,
+  }));
+  // ground-truth ambient occlusion: contact darkness between wheels, bridges and plate
+  const gtao = new GTAOPass(scene, camera, 256, 256);
+  gtao.updateGtaoMaterial({ radius: 1.8, distanceExponent: 1.4, thickness: 1.5, scale: 1.15, samples: 16 });
+  gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 16 });
+  gtao.blendIntensity = 0.85;
+  {
+    const base = gtao.render.bind(gtao);
+    gtao.render = (...args) => { const v = G.glass.visible; G.glass.visible = false; base(...args); G.glass.visible = v; };
+  }
+  composer.addPass(gtao);
   const bokeh = new BokehPass(scene, camera, { focus: 150, aperture: 0.0002, maxblur: 0.009 });
   composer.addPass(bokeh);
-  const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.18, 0.5, 0.96);
+  const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.12, 0.4, 1.6);
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
+  // film grade: cool shadows, warm highlights, lens vignette, faint chromatic fringe, grain
+  const grade = new ShaderPass({
+    uniforms: { tDiffuse: { value: null }, time: { value: 0 }, res: { value: new THREE.Vector2(1, 1) }, grain: { value: 0.035 }, vignette: { value: 0.32 }, ca: { value: 0.0025 } },
+    vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `uniform sampler2D tDiffuse; uniform float time, grain, vignette, ca; uniform vec2 res; varying vec2 vUv;
+      float rnd(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+      void main(){
+        vec2 d = vUv - 0.5; float r2 = dot(d, d);
+        vec2 off = d * ca * r2 * 4.0;
+        vec3 c = vec3(texture2D(tDiffuse, vUv + off).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - off).b);
+        float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+        c += vec3(-0.012, 0.0, 0.022) * (1.0 - smoothstep(0.0, 0.45, l));
+        c += vec3(0.022, 0.01, -0.014) * smoothstep(0.55, 1.0, l);
+        c = mix(vec3(l), c, 1.06);
+        c *= 1.0 - vignette * smoothstep(0.12, 0.62, r2 * 1.5);
+        c += (rnd(vUv * res + fract(time) * 97.0) - 0.5) * grain;
+        gl_FragColor = vec4(c, 1.0);
+      }`,
+  });
+  composer.addPass(grade);
+
+  /* ---------------- adaptive quality: keep it fluid on every machine ---------------- */
+  const forceHQ = /hq/.test(location.search) || location.hash === '#hq';
+  const TIERS = [
+    { pr: 0.75, ao: false, dof: false, bloom: false, shadow: 1024 },
+    { pr: 1, ao: false, dof: true, bloom: true, shadow: 2048 },
+    { pr: 1.5, ao: true, dof: true, bloom: true, shadow: 2048 },
+    { pr: 2, ao: true, dof: true, bloom: true, shadow: 3072 },
+  ];
+  let tier = forceHQ ? 3 : mobileMQ.matches ? 1 : 2;
+  if (forceHQ) window.__helior = { gtao, bokeh, bloom, grade, M, G };
+  let prNow = 1, upgraded = false;
+  function applyTier() {
+    const q = TIERS[tier];
+    prNow = Math.min(devicePixelRatio || 1, q.pr);
+    gtao.enabled = q.ao; bokeh.enabled = q.dof; bloom.enabled = q.bloom;
+    if (key.shadow.mapSize.x !== q.shadow) {
+      key.shadow.mapSize.set(q.shadow, q.shadow);
+      if (key.shadow.map) { key.shadow.map.dispose(); key.shadow.map = null; }
+    }
+    resize();
+  }
 
   /* ---------------- interaction state ---------------- */
   let W = 1, H = 1, mobile = false;
   function resize() {
     W = innerWidth; H = innerHeight;
     mobile = mobileMQ.matches;
-    const pr = Math.min(devicePixelRatio || 1, 2);
-    renderer.setPixelRatio(pr);
+    renderer.setPixelRatio(prNow);
     renderer.setSize(W, H, false);
-    composer.setPixelRatio(pr);
+    composer.setPixelRatio(prNow);
     composer.setSize(W, H);
+    grade.uniforms.res.value.set(W * prNow, H * prNow);
     camera.aspect = W / H;
     camera.updateProjectionMatrix();
   }
-  resize();
+  applyTier();
   addEventListener('resize', resize);
 
   let mx = 0, my = 0, smx = 0, smy = 0;
@@ -917,20 +1018,40 @@ function buildStage(renderer) {
   const lookV = new THREE.Vector3();
   const eul = new THREE.Euler();
 
-  let smoothT = scrollT();
+  let smoothT = scrollT(), velT = 0;
   let simTime = 0, lastBeat = 0;
+  let introStart = -1, perfN = 0, perfSum = 0;
   let last = performance.now();
   let first = true;
 
   function frame(now) {
     requestAnimationFrame(frame);
-    const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    const rawDt = (now - last) / 1000;
+    const dt = Math.min(0.1, rawDt); last = now;
     if (document.hidden) return;
     const reduce = reduceMQ.matches;
+    stepWheel(dt);
 
+    // adaptive quality, measured once the intro has settled
+    if (!forceHQ && introStart >= 0 && now - introStart > 3500 && rawDt < 0.5) {
+      perfSum += rawDt; perfN++;
+      if (perfN === 90) {
+        const avg = perfSum / perfN;
+        if (avg > 0.024 && tier > 0) { tier--; applyTier(); } else if (avg < 0.0125 && tier < 3 && !upgraded && !mobile) { tier++; upgraded = true; applyTier(); }
+        perfN = 0; perfSum = 0;
+      }
+    }
+
+    // critically damped spring: the timeline follows the scroll with weight, never overshoots
     const target = scrollT();
-    smoothT = reduce ? target : smoothT + (target - smoothT) * (1 - Math.exp(-dt * 4.2));
-    if (Math.abs(target - smoothT) < 1e-4) smoothT = target;
+    if (reduce) { smoothT = target; velT = 0; } else {
+      const k = 16, c = 2 * Math.sqrt(k);
+      let rem = dt;
+      while (rem > 1e-6) { const h = Math.min(rem, 1 / 120); velT += (k * (target - smoothT) - c * velT) * h; smoothT += velT * h; rem -= h; }
+      if (Math.abs(target - smoothT) < 1e-4 && Math.abs(velT) < 1e-3) { smoothT = target; velT = 0; }
+    }
+    if (introStart < 0) introStart = now;
+    const intro = reduce ? 1 : smoothstep(0, 1, clamp((now - introStart) / 3200));
     const t = smoothT;
     updateChrome(t);
 
@@ -943,7 +1064,7 @@ function buildStage(renderer) {
 
     smx += (mx - smx) * (1 - Math.exp(-dt * 3));
     smy += (my - smy) * (1 - Math.exp(-dt * 3));
-    const idle = reduce ? 0 : Math.sin(now * 0.00035) * 0.035;
+    const idle = reduce ? 0 : Math.sin(now * 0.00035) * 0.035 - (1 - intro) * 0.55;
     const par = reduce ? 0 : 1;
     watch.rotation.set(
       lerp(a.rot[0], b.rot[0], f) + smy * 0.09 * par,
@@ -972,9 +1093,19 @@ function buildStage(renderer) {
     lookV.set(lerp(a.look[0], b.look[0], f), lerp(a.look[1], b.look[1], f), lerp(a.look[2], b.look[2], f)).applyEuler(eul);
     const aspect = W / H;
     const distMul = aspect < 1 ? Math.max(1, 1.18 / aspect) * 0.86 : 1;
-    const dist = lerp(a.dist, b.dist, f) * distMul;
-    camera.position.set(lookV.x, lookV.y, lookV.z + dist);
+    const fov = lerp(a.fov, b.fov, f);
+    const lens = Math.tan((26 * Math.PI) / 360) / Math.tan((fov * Math.PI) / 360);
+    const dist = lerp(a.dist, b.dist, f) * distMul * lens * (1 + (1 - intro) * 0.35);
+    if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
+    const hand = reduce ? 0 : dist * 0.0012;
+    camera.position.set(
+      lookV.x + Math.sin(now * 0.00041) * hand,
+      lookV.y + Math.sin(now * 0.00029 + 1.3) * hand,
+      lookV.z + dist,
+    );
     camera.lookAt(lookV);
+    key.intensity = 2.6 * (0.25 + 0.75 * intro);
+    scene.environmentIntensity = 0.35 + 0.65 * intro;
     const sx = lerp(a[L][0], b[L][0], f), sy = lerp(a[L][1], b[L][1], f);
     camera.setViewOffset(W, H, -sx * W, sy * H, W, H);
 
@@ -1010,7 +1141,8 @@ function buildStage(renderer) {
     center.rotation.z = -(simTime / 3600) * TAU;
     barrel.rotation.z = (simTime / 28800) * TAU;
 
-    key.position.set(40 + smx * 20, 50 - smy * 20, 70);
+    // the key light sweeps across during the intro, then follows the mouse slightly
+    key.position.set(40 + smx * 20 - (1 - intro) * 110, 50 - smy * 20, 70);
 
     // exploded-view labels
     const tagAlpha = smoothstep(1.5, 1.85, t) * (1 - smoothstep(2.2, 2.55, t));
@@ -1032,6 +1164,7 @@ function buildStage(renderer) {
 
     bokeh.uniforms.focus.value = dist;
     bokeh.uniforms.aperture.value = lerp(a.dof, b.dof, f) * (mobile ? 0.6 : 1);
+    grade.uniforms.time.value = now * 0.001;
     composer.render(dt);
     if (first) { first = false; loader.classList.add('done'); }
   }
