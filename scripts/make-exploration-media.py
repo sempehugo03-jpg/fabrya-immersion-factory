@@ -25,8 +25,11 @@ ASSEMBLY = """Tu es FABRYA, auteur du média visuel qui vient d'être fabriqué.
 à partir de ta vision et du contrat de ton média. Charge le fichier media.html dans une iframe titrée
 et visible dès l'ouverture. Les commandes relaient immédiatement leur état avec
 iframe.contentWindow.postMessage({type:"fabrya:configuration",values:...},"*").
+La première tentative affichait uniquement une iframe et envoyait un objet vide. Cette fois, fabrique
+des commandes visibles, nommées et opérationnelles pour toutes les entrées de controls du contrat.
+Pour toute commande, modifie la valeur du bon champ et émets la totalité de l'état courant.
 Utilise les clés et les valeurs exactes du contrat, sans simuler de commandes. Envoie l'état initial
-lorsque l'iframe est prête. Tous les libellés, la navigation, la mise en page et les interactions
+complet lorsque l'iframe est prête. Tous les libellés, la navigation, la mise en page et les interactions
 qui respectent cette vision relèvent de ta propre décision. Assure une présentation utilisable sur mobile,
 l'accès au clavier et la lisibilité à l'ouverture. Démo fictive, aucun appel externe, aucun formulaire
 commercial réel. Rends un seul document HTML complet, CSS et JavaScript intégrés, sans Markdown.
