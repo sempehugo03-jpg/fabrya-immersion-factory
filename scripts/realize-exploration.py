@@ -60,6 +60,17 @@ def generate(args):
             " Garde tes décisions artistiques et termine chaque balise. Sois concis, même sur les espaces."
         )
         phase = "production-reprise"
+    if args.retry_invariants:
+        system += (
+            "\nPremière tentative : l'HTML s'ouvre mais seuls les noms des étapes s'affichent."
+            " Les boutons changent une classe sans changement visible, l'objet à configurer est absent"
+            " et le visiteur ne peut modifier aucun composant. Réalise ton expérience avec des médias"
+            " effectivement produits et des appels utilisateur qui modifient un état visible."
+            " Chaque contrôle affiché doit être relié au rendu. Les médias, textes et interactions"
+            " restent tes choix. Fais une page complète, sans pseudo-code. Assure-toi de livrer ta"
+            " réalisation au lieu de répéter la description de la vision."
+        )
+        phase = "production-invariants"
     if args.review:
         system = REVIEW
         phase = "corrections"
@@ -84,6 +95,10 @@ def generate(args):
         request["repeat_penalty"] = 1.15
         request["repeat_last_n"] = 256
         request["max_tokens"] = 2900
+    if args.retry_invariants:
+        request["repeat_penalty"] = 1.13
+        request["repeat_last_n"] = 192
+        request["max_tokens"] = 3600
     if args.review:
         request["response_format"] = {"type": "json_object"}
         request["max_tokens"] = 1100
@@ -121,6 +136,7 @@ if __name__ == "__main__":
     for name in ("exploration", "brief", "evidence", "site", "review"):
         parser.add_argument(f"--{name}", type=Path, required=name != "review")
     parser.add_argument("--retry-incomplete", action="store_true")
+    parser.add_argument("--retry-invariants", action="store_true")
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--model", required=True)
     generate(parser.parse_args())
