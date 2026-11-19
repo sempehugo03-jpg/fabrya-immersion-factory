@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Horlogerie Immersive</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <canvas id="horlogeCanvas"></canvas>
+    <script id="fabrya-media-protocol" type="application/json">
+        {
+            "controls": [
+                {
+                    "key": "clockType",
+                    "label": "Type de Montre",
+                    "choices": [
+                        { "value": "quartz", "label": "Quartz" },
+                        { "value": "mechanique", "label": "Mécanique" }
+                    ]
+                },
+                {
+                    "key": "material",
+                    "label": "Matériau",
+                    "choices": [
+                        { "value": "acier", "label": "Acier" },
+                        { "value": "or", "label": "Or" }
+                    ]
+                },
+                {
+                    "key": "bracelet",
+                    "label": "Bracelet",
+                    "choices": [
+                        { "value": "non", "label": "Non" },
+                        { "value": "acier", "label": "Acier" },
+                        { "value": "or", "label": "Or" }
+                    ]
+                },
+                {
+                    "key": "color",
+                    "label": "Couleur",
+                    "choices": [
+                        { "value": "noir", "label": "Noir" },
+                        { "value": "blanc", "label": "Blanc" },
+                        { "value": "rouge", "label": "Rouge" }
+                    ]
+                }
+            ]
+        }
+    </script>
+    <script>
+        const canvas = document.getElementById('horlogeCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let clockType = 'quartz';
+        let material = 'acier';
+        let bracelet = 'non';
+        let color = 'noir';
+
+        function drawClock() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Dessiner le fond de l'horloge
+            ctx.fillStyle = `#${color}`;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Dessiner la montre
+            if (clockType === 'quartz') {
+                ctx.font = `${canvas.width / 10}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('QUARTZ', canvas.width / 2, canvas.height / 2);
+            } else if (clockType === 'mechanique') {
+                ctx.beginPath();
+                ctx.arc(canvas.width / 2, canvas.height / 2, canvas.width / 4, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            // Dessiner le bracelet si présent
+            if (bracelet !== 'non') {
+                const braceletWidth = canvas.width / 8;
+                const braceletHeight = canvas.height / 6;
+
+                ctx.fillStyle = `#${material === 'or' ? 'gold' : 'silver'}`;
+                ctx.fillRect(canvas.width / 2 - braceletWidth / 2, canvas.height / 2 + canvas.width / 4, braceletWidth, braceletHeight);
+            }
+        }
+
+        function handleConfiguration(event) {
+            const { values } = event.data;
+            Object.assign({ clockType, material, bracelet, color }, values);
+            drawClock();
+        }
+
+        window.addEventListener('message', handleConfiguration);
+
+        drawClock();
+    </script>
+</body>
+</html>
