@@ -1,4 +1,5 @@
 """Use the original exploration pipeline with post-decode schema validation."""
+import copy
 import hashlib
 import json
 import os
@@ -65,7 +66,23 @@ def local_json_speaker(url, model):
         }
         wire = run.directory / f"{stage}-transport-request.json"
         fast = os.environ.get("FABRYA_FAST_JSON") == "1"
-        shape = describe_shape(schema)
+        assignment = fast and stage.startswith("artistic_selection")
+        wire_schema = copy.deepcopy(schema)
+        if assignment:
+            properties = wire_schema["properties"]
+            member_value = {
+                "type": "object",
+                "properties": {"group": {"type": "string"}, "evidence": {"type": "string"}},
+                "required": ["group", "evidence"], "additionalProperties": False,
+            }
+            expected_ids = properties["selected"]["enum"]
+            properties.pop("groups")
+            properties["assignments"] = {
+                "type": "object", "properties": dict.fromkeys(expected_ids, member_value),
+                "required": expected_ids, "additionalProperties": False,
+            }
+            wire_schema["required"] = [name for name in wire_schema["required"] if name != "groups"] + ["assignments"]
+        shape = describe_shape(wire_schema)
         previous_failure = ""
         for attempt, seed in enumerate((23, 29, 37), 1):
             if fast:
@@ -76,6 +93,14 @@ def local_json_speaker(url, model):
                     " Dans une liste, ferme chaque objet avant de commencer le suivant."
                     " Aucune clé ne doit se répéter dans un même objet. Aucun bloc Markdown.\n"
                 )
+                if assignment:
+                    guidance += (
+                        "Représente tes groupes dans assignments sous la forme d'une entrée obligatoire pour chaque ID : "
+                        + ", ".join(expected_ids)
+                        + ". group contient le nom de groupe que tu attribues librement à cette piste."
+                          " Deux pistes du même groupe ont exactement le même nom. evidence justifie cette affectation."
+                          " Renseigne chaque ID, y compris les pistes écartées. selected est indépendant des groupes.\n"
+                    )
                 stage_request["messages"][0]["content"] = instructions + guidance + shape + previous_failure
             else:
                 stage_request["response_format"] = {
@@ -97,6 +122,23 @@ def local_json_speaker(url, model):
                 if raw_output.startswith("```") and raw_output.endswith("```"):
                     raw_output = raw_output.split("\n", 1)[1].removesuffix("```").strip()
                 output = json.loads(raw_output, object_pairs_hook=unique_fields)
+                if assignment:
+                    validate(wire_schema, output)
+                    groups = {}
+                    for member, data in output.pop("assignments").items():
+                        name = data["group"].strip()
+                        evidence = data["evidence"].strip()
+                        if not name or not evidence:
+                            raise Rejected("Every concept requires an explicit group and justification")
+                        group = groups.setdefault(name, {"members": [], "evidence": []})
+                        group["members"].append(member)
+                        group["evidence"].append(evidence)
+                    output["groups"] = [
+                        {"members": group["members"], "evidence": " ".join(group["evidence"])}
+                        for group in groups.values()
+                    ]
+                    run.record("local_schema_normalization", "completed", phase=stage,
+                               operation="group_explicit_model_assignments")
                 validate(schema, output)
                 if stage.startswith("artistic_selection"):
                     expected = schema["properties"]["selected"]["enum"]
