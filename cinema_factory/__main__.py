@@ -58,7 +58,7 @@ def launch(args, run):
     for url in destinations.values():
         validate_destination(url)
     run.record("intake", "completed", brief_sha256=digest(args.brief),
-               capabilities=info, source="model" if args.mode == "run" else "supplied-plan")
+               capabilities=info, source="supplied-plan" if args.mode == "assemble" else "model")
     design_only = args.mode == "design"
     planned = args.mode != "assemble"
     offer = getattr(args, "offer", "cinematic")

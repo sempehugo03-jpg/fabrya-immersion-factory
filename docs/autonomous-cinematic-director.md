@@ -26,7 +26,7 @@ La branche part du commit `21400c3`. Le dossier du premier essai, les commits du
 | Production | Payload HTTP par fournisseur, sources, paramètres et budget global | Le cycle existant génère, encode et monte. Les références identiques et les requêtes identiques sont réutilisées. Les droits de diffusion restent à valider. |
 | Critique et révision | Évaluation indépendante sur des images réelles, défauts avec axe, fait visible, temps, portée et confiance | Le critique reçoit les deux cadrages et des mesures temporelles. La correction ne modifie que la portée justifiée et conserve les preuves. |
 
-Le contrat fourni au modèle limite les routes, les identifiants de médias et les destinations à l'inventaire du projet. Le contrôle de similarité calcule le recoupement des termes, sans utiliser les titres. Une idée reformulée avec un vocabulaire différent peut rester invisible à cette mesure. Le benchmark expose les idées, le choix et la comparaison pour permettre une revue artistique humaine des mécanismes.
+Le contrat fourni au modèle limite les routes, les identifiants de médias et les destinations à l'inventaire du projet. Les concepts antérieurs servent à la comparaison après l'inférence, sans fournir leurs scènes au modèle. Le contrôle de similarité calcule le recoupement des termes, sans utiliser les titres. Une idée reformulée avec un vocabulaire différent peut rester invisible à cette mesure. Le benchmark expose les idées, le choix et la comparaison pour permettre une revue artistique humaine des mécanismes.
 
 ## Prompt Engine et fournisseurs
 

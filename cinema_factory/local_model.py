@@ -22,7 +22,8 @@ def local_speaker(url, model):
             ]
         else:
             user_prompt = "\n".join(item["text"] for item in content)
-        result = request_json(url.rstrip("/") + "/v1/chat/completions", headers={}, timeout=420, payload={
+        # CPU-only structured decoding can take several minutes on the benchmark host.
+        result = request_json(url.rstrip("/") + "/v1/chat/completions", headers={}, timeout=900, payload={
             "model": model, "stream": False, "temperature": .55, "seed": 19,
             "max_tokens": 3300,
             "messages": [{"role": "system", "content": instructions},
