@@ -11,7 +11,8 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "horloger-factory"))
 
 from cinema_factory.contracts import STR, Rejected, array, record, validate
-from cinema_factory.runtime import Run, request_json, write_json
+from cinema_factory.runtime import Run, write_json
+from cinema_factory.local_model import receive_structured
 
 ROOT = Path(os.environ["FABRYA_RUN_DIRECTORY"]).resolve()
 EXP = ROOT / "exploration"
@@ -68,14 +69,9 @@ def local_call(run, name, system, schema, data, token_cap):
         }},
     )
     write_json(path / f"{name}-requete.json", payload)
-    raw = request_json("http://127.0.0.1:18821/v1/chat/completions", headers={}, payload=payload, timeout=900)
-    write_json(path / f"{name}-reponse.json", raw)
+    result, raw = receive_structured("http://127.0.0.1:18821/v1/chat/completions",
+                                     payload, path / name, schema)
     run.record(name, "received", model=raw.get("model"), tokens=raw.get("usage"), charged_microusd=0)
-    choice = raw["choices"][0]
-    if choice["finish_reason"] != "stop":
-        raise Rejected(f"Réponse locale interrompue ({name})")
-    result = json.loads(choice["message"]["content"])
-    validate(schema, result)
     write_json(path / f"{name}.json", result)
     return result
 

@@ -10,7 +10,7 @@ jobs:
   build:
     if: github.event.repository.private == false
     runs-on: ubuntu-24.04
-    timeout-minutes: 24
+    timeout-minutes: 27
     env:
       FABRYA_LOCAL_MODEL: fabrya-local-qwen-7b-q3-k-m
       FABRYA_BROWSER_EVIDENCE: '1'
@@ -29,6 +29,7 @@ jobs:
           curl -fsSL --retry 2 --max-time 420 https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF/resolve/bb5d59e/qwen2.5-7b-instruct-q3_k_m.gguf -o "$RUNNER_TEMP/fabrya-model/model.gguf"
           sha256sum "$RUNNER_TEMP/fabrya-model/model.gguf" > fabrya-run/model-sha256.txt
           npm install --no-save playwright@1.57.0
+          echo "Streaming decoder; no creative instruction edits."
       - name: Run the exact brief and collect browser observations
         shell: bash
         run: |
