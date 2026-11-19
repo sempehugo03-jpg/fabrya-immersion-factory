@@ -6,11 +6,12 @@ on:
       - .github/workflows/fabrya-horloger-carte-blanche.yml
 permissions:
   contents: read
+  actions: read
 jobs:
   build:
     if: github.event.repository.private == false
     runs-on: ubuntu-24.04
-    timeout-minutes: 27
+    timeout-minutes: 28
     env:
       FABRYA_LOCAL_MODEL: fabrya-local-qwen-7b-q3-k-m
       FABRYA_BROWSER_EVIDENCE: '1'
@@ -19,6 +20,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: fabrya-horloger-execution
+          run-id: 44565104326
+          github-token: ${{ github.token }}
+          path: fabrya-previous
       - name: Prepare public model and runtime
         shell: bash
         run: |
@@ -35,6 +42,7 @@ jobs:
         run: |
           set -euo pipefail
           export FABRYA_RUN_DIRECTORY="$PWD/fabrya-run"
+          export FABRYA_PREVIOUS_EXECUTION="$PWD/fabrya-previous"
           export FABRYA_CHROMIUM="$(command -v google-chrome || command -v chromium)"
           export PYTHONPATH="$PWD"
           printf '%s\n' 'Tu es un horloger et tu dois me créer un putain de site immersif.' > fabrya-run/brief.txt
@@ -47,7 +55,7 @@ jobs:
             kill -0 "$server_pid" || { tail -20 fabrya-run/llama.log; exit 2; }
             sleep 1
           done
-          python3 -m cinema_factory explore fabrya-run/brief.txt --out fabrya-run/exploration --production-cap-microusd 0 --local-url http://127.0.0.1:18821 --local-model "$FABRYA_LOCAL_MODEL"
+          python3 experiments/horloger-carte-blanche/resume.py
           python3 experiments/horloger-carte-blanche/produce.py
       - uses: actions/upload-artifact@v4
         if: always()
