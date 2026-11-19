@@ -24,13 +24,16 @@ def run_brief(brief, args):
     process = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
     result = {"brief": str(brief.relative_to(ROOT)), "passed": process.returncode == 0,
               "returncode": process.returncode, "message": process.stderr.strip()}
-    runs = sorted(dest.glob("attempt-*"))
-    if runs and (runs[-1] / "direction.json").is_file():
-        direction = json.loads((runs[-1] / "direction.json").read_text())
+    attempts = sorted(dest.glob("attempt-*"), reverse=True)
+    latest_direction = next((work for work in attempts if (work / "direction.json").is_file()), None)
+    if latest_direction:
+        direction = json.loads((latest_direction / "direction.json").read_text())
         concepts = direction["concepts"]
-        result.update(concepts=concepts, selected=direction["selected"], rationale=direction["rationale"])
-    if runs and (runs[-1] / "production-estimate.json").is_file():
-        result["estimate"] = json.loads((runs[-1] / "production-estimate.json").read_text())
+        result.update(concepts=concepts, selected=direction["selected"], rationale=direction["rationale"],
+                      direction_attempt=latest_direction.name)
+        estimate = latest_direction / "production-estimate.json"
+        if estimate.is_file():
+            result["estimate"] = json.loads(estimate.read_text())
     print(f'{brief.stem}: {"accepted" if result["passed"] else result["message"]}', flush=True)
     return result
 

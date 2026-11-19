@@ -2,6 +2,7 @@ from copy import deepcopy
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import runpy
 import tempfile
 import unittest
 
@@ -201,6 +202,30 @@ class ProviderInventoryContractTests(unittest.TestCase):
     def test_a_revision_can_propose_a_nonzero_trim(self):
         schema = directing_schema("cinematic", {"fal-text": ROUTES["fal-text"]}, {}, {}, editing=True)
         self.assertNotIn("enum", schema["properties"]["shots"]["items"]["properties"]["trim_start"])
+
+
+class BenchmarkEvidenceTests(unittest.TestCase):
+    def test_final_timeout_keeps_the_last_completed_direction(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        run_brief = runpy.run_path(str(BASE / "scripts/benchmark-director.py"))["run_brief"]
+        brief = BASE / "briefs/director/calibration/acoustique.md"
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            completed = root / "calibration/acoustique/attempt-1"
+            completed.mkdir(parents=True)
+            (completed.parent / "attempt-2").mkdir()
+            (completed / "direction.json").write_text(json.dumps(direction_fixture()))
+            args = SimpleNamespace(out=root, url="http://127.0.0.1", model="fixture",
+                                   corrections=1, cap=0, history=[])
+            with patch("subprocess.run", return_value=SimpleNamespace(
+                returncode=2, stderr="blocked: model response timed out"
+            )), patch("builtins.print"):
+                evidence = run_brief(brief, args)
+            self.assertFalse(evidence["passed"])
+            self.assertEqual(evidence["direction_attempt"], "attempt-1")
+            self.assertEqual(len(evidence["concepts"]), 3)
 
 
 class EndToEndContractTests(unittest.TestCase):
