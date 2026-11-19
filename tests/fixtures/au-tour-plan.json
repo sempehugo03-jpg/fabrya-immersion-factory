@@ -1,0 +1,27 @@
+{
+  "brand": "Résonance · FABRYA",
+  "audience": "Visiteurs de la démonstration",
+  "goal": "Découvrir le façonnage sur un tour de potier",
+  "facts": ["Film historique fourni avec le prototype Au tour."],
+  "unknowns": ["Aucune boutique ni possibilité de réservation n'est fournie."],
+  "concepts": [
+    {"name": "Au tour", "entry": "Mains autour d'une pièce en rotation", "discovery": "La pression des mains forme la pièce", "tradeoff": "Caméra fixe sur le geste"},
+    {"name": "Le bord", "entry": "Silhouette du bord de la pièce", "discovery": "Forme et texture de l'argile", "tradeoff": "Exigerait un autre plan"}
+  ],
+  "selected": 0,
+  "rationale": "Plan et source fournis pour le test de régression.",
+  "visual_bible": "Lumière douce, plan rapproché, palette d'argile.",
+  "description": "Des mains façonnent une pièce d’argile sur un tour de potier.",
+  "shots": [
+    {"route": "client", "asset_id": "au-tour", "seconds": 8, "trim_start": 0, "resolution": "2160p", "movement": "Rotation de la pièce et mouvements des mains", "video_prompt": "", "reference_prompt": "", "raccord": "Plan unique", "rationale": "Utilise le tournage historique autorisé."}
+  ],
+  "mobile_center": 0.44375,
+  "actions": [
+    {"id": "faconnage", "label": "Examiner le façonnage", "heading": "Le façonnage au tour", "body": "Les doigts et la paume guident la forme pendant que l’eau permet aux mains de glisser.", "destination_id": ""},
+    {"id": "argile", "label": "Découvrir l’argile", "heading": "L’argile en mouvement", "body": "La rotation aide à répartir le geste sur la circonférence de la pièce.", "destination_id": ""}
+  ],
+  "hotspots": [
+    {"action_id": "argile", "shot": 0, "start": 1, "end": 3, "x": 0.46, "y": 0.56},
+    {"action_id": "faconnage", "shot": 0, "start": 3.5833333333333335, "end": 8, "x": 0.458, "y": 0.53}
+  ]
+}

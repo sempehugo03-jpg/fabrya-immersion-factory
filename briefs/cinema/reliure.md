@@ -1,0 +1,1 @@
+Les Pages Retrouvées est un atelier de restauration de livres anciens. Ses clients sont des particuliers attachés à un ouvrage de famille. Le site doit expliquer ce que l'atelier peut examiner avant de proposer une intervention et encourager une prise de contact. Aucune adresse, promesse de restauration ni grille tarifaire n'est fournie.

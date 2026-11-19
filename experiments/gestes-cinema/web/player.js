@@ -8,6 +8,10 @@ const context = canvas.getContext('2d', { alpha: false });
 const hotspot = screen.querySelector('.hotspot');
 const dialog = document.querySelector('dialog');
 const error = screen.querySelector('.error');
+const detailTitle = dialog.querySelector('#detail-title');
+const detailCopy = dialog.querySelector('.detail-copy');
+const detailLink = dialog.querySelector('.detail-link');
+const directActions = document.querySelector('.direct-actions');
 const mobile = matchMedia('(max-width: 650px)');
 const reduced = matchMedia('(prefers-reduced-motion: reduce)');
 const cache = new Map();
@@ -20,6 +24,8 @@ let presented = -1;
 let direction = 1;
 let request;
 let modalScroll;
+let activePoint;
+let opener;
 
 const distance = () => Math.max(1, track.offsetHeight - pin.offsetHeight);
 const clamp = (value, top) => Math.max(0, Math.min(top, value));
@@ -41,13 +47,16 @@ function present(index) {
   const moment = performance.now();
   canvas.hidden = false;
   presented = index;
-  const point = sequence.hotspot;
-  const visibleX = (point.x - source.profile.left) / source.profile.span;
-  const visible = index >= point.start && index <= point.end;
-  if (!visible && document.activeElement === hotspot) slider.focus({ preventScroll: true });
-  hotspot.hidden = !visible;
-  hotspot.style.setProperty('--x', `${visibleX * 100}%`);
-  hotspot.style.setProperty('--y', `${point.y * 100}%`);
+  activePoint = (sequence.hotspots ?? [sequence.hotspot]).find(point =>
+    index >= point.start && index <= point.end);
+  if (!activePoint && document.activeElement === hotspot) slider.focus({ preventScroll: true });
+  hotspot.hidden = !activePoint;
+  if (activePoint) {
+    const visibleX = (activePoint.x - source.profile.left) / source.profile.span;
+    hotspot.style.setProperty('--x', `${visibleX * 100}%`);
+    hotspot.style.setProperty('--y', `${activePoint.y * 100}%`);
+    if (activePoint.action) hotspot.setAttribute('aria-label', activePoint.action.label);
+  }
   screen.dataset.presented = String(index);
   if (request) notify('presented', { ...request, moment });
 }
@@ -163,16 +172,47 @@ function readPreference() {
     : 'Défilez pour avancer ou revenir.';
   if (!reduced.matches) updateFromScroll();
 }
-hotspot.addEventListener('click', () => {
+function openDetail(origin, action) {
+  if (action) {
+    detailTitle.textContent = action.heading;
+    detailCopy.textContent = action.body;
+    detailLink.hidden = !action.href;
+    if (action.href) {
+      detailLink.href = action.href;
+      detailLink.textContent = action.label;
+    } else {
+      detailLink.removeAttribute('href');
+    }
+  }
+  opener = origin;
   modalScroll = scrollY;
   dialog.showModal();
-});
-dialog.querySelector('.close').addEventListener('click', () => dialog.close());
-dialog.addEventListener('close', () => {
-  if (!reduced.matches && scrollY !== modalScroll) scrollTo({ top: modalScroll, behavior: 'instant' });
-  (hotspot.hidden ? slider : hotspot).focus({ preventScroll: true });
+}
+
+hotspot.addEventListener('click', () => openDetail(hotspot, activePoint?.action));
+for (const button of directActions?.querySelectorAll('button') ?? []) {
+  button.addEventListener('click', () => openDetail(button, {
+    heading: button.dataset.heading,
+    body: button.dataset.body,
+  }));
+}
+function resumeFilm() {
+  if (dialog.open || modalScroll === undefined) return;
+  const previousScroll = modalScroll;
+  modalScroll = undefined;
+  if (!reduced.matches && scrollY !== previousScroll) {
+    scrollTo({ top: previousScroll, behavior: 'instant' });
+  }
+  (opener.hidden ? slider : opener).focus({ preventScroll: true });
   pump();
+  notify('resumed', { index: presented });
+}
+
+dialog.querySelector('.close').addEventListener('click', () => {
+  dialog.close();
+  resumeFilm();
 });
+dialog.addEventListener('close', resumeFilm);
 
 try {
   const response = await fetch('track.json');

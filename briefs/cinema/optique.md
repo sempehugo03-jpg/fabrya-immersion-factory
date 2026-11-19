@@ -1,0 +1,1 @@
+Maison Sillage est un opticien indépendant. L'équipe aide les personnes qui hésitent à choisir une monture confortable adaptée à un usage quotidien. Le site doit faire comprendre la valeur d'un essayage accompagné et donner envie de contacter la boutique. Aucun tarif, créneau ni contact public vérifié n'est fourni.

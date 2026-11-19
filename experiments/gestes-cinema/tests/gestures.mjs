@@ -9,9 +9,10 @@ const require = createRequire(import.meta.url);
 const playwright = process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES
   ? require(path.join(process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES, 'playwright'))
   : require('playwright');
-const [outputArg = 'preuves', url = 'https://resonance.local/'] = process.argv.slice(2);
+const [outputArg = 'preuves', url = 'https://resonance.local/', webRoot] = process.argv.slice(2);
 const output = path.resolve(outputArg);
-const root = fileURLToPath(new URL('../web/', import.meta.url));
+const root = webRoot ? path.resolve(webRoot) : fileURLToPath(new URL('../web/', import.meta.url));
+const manifest = JSON.parse(await readFile(path.join(root, 'track.json'), 'utf8'));
 const types = { '.html':'text/html', '.json':'application/json', '.js':'text/javascript',
   '.css':'text/css', '.webp':'image/webp', '.bin':'application/octet-stream' };
 await mkdir(output, { recursive:true });
@@ -82,9 +83,11 @@ async function setup(browser, profile, viewport) {
     });
   });
   const page = await context.newPage();
+  const started = performance.now();
   await page.goto(url);
   await page.locator('canvas:visible').waitFor();
-  return {context,page,cdp:await context.newCDPSession(page)};
+  const readyMs = Math.round(performance.now() - started);
+  return {context,page,cdp:await context.newCDPSession(page),readyMs};
 }
 
 async function phase(page,label) {
@@ -178,7 +181,7 @@ function summarize(log) {
 }
 
 async function walkthrough(browser, name, viewport) {
-  const {page,cdp}=await setup(browser,name,viewport);
+  const {page,cdp,readyMs}=await setup(browser,name,viewport);
   const mobile=name==='mobile';
   const wheel=async (delta,count=1,timeout=25)=>{
     await page.mouse.move(viewport.width/2,viewport.height/2);
@@ -219,23 +222,27 @@ async function walkthrough(browser, name, viewport) {
   await sleep(450);
   const reversal=await stable(page);
   await phase(page,'AVANCER VERS LA FICHE');
-  if (mobile) await swipes(cdp,250,4,17);
+  const button = page.locator('.hotspot');
+  if (manifest.hotspots) {
+    // Scroll gestures have already been exercised. Use the accessible control to target any cue.
+    const selected = manifest.hotspots[0];
+    await seek(page, Math.floor((selected.start + selected.end) / 2));
+  } else if (mobile) await swipes(cdp,250,4,17);
   else await wheel(150,5,19);
-  await page.getByRole('button',{name:'Examiner le façonnage au tour'}).waitFor();
+  await button.waitFor();
   const anchor=await stable(page);
   states.push(anchor);
   await phase(page,'OUVRIR LA FICHE');
-  const button=page.getByRole('button',{name:'Examiner le façonnage au tour'});
   await (mobile ? button.tap() : button.click());
   await page.getByRole('dialog').waitFor();
   if (!mobile) await wheel(70, 3);
   await sleep(1200);
   assert.equal(await stable(page),anchor);
-  const close=page.getByRole('button',{name:'Fermer la fiche'});
-  await (mobile ? close.tap() : close.click());
+  await closeDetail(page, mobile);
   await page.getByRole('dialog').waitFor({state:'hidden'});
   assert.equal(await stable(page),anchor);
-  assert(await button.evaluate(el=>el===document.activeElement));
+  await page.waitForFunction(() => document.activeElement === document.querySelector('.hotspot'));
+  if (manifest.hotspots) await verifyActions(page, mobile);
 
   await phase(page,'RETOUR À LA PREMIÈRE IMAGE');
   if(mobile) await swipes(cdp,-250,9,12);
@@ -249,7 +256,74 @@ async function walkthrough(browser, name, viewport) {
   const captured=await finish();
   const log=await page.evaluate(()=>window.filmTest);
   assert(log.inputs.some(e=>e.type===(mobile?'touchmove':'wheel')));
-  return {viewport,states,rapidReversalSettled:reversal,identicalAtStartAndReturn:identical,capturedFrames:captured,metrics:summarize(log),log};
+  return {viewport,readyMs,states,rapidReversalSettled:reversal,identicalAtStartAndReturn:identical,capturedFrames:captured,metrics:summarize(log),log};
+}
+
+async function closeDetail(page, mobile) {
+  await page.evaluate(() => {
+    window.filmResumed = new Promise(resolve => document.querySelector('#screen')
+      .addEventListener('film:resumed', resolve, { once:true }));
+  });
+  const close = page.getByRole('button', {name:'Fermer la fiche'});
+  await (mobile ? close.tap() : close.click());
+  await page.evaluate(() => window.filmResumed.then(() => true));
+}
+
+async function seek(page, frame) {
+  await page.locator('#progress').evaluate((input, index) => {
+    input.value = index;
+    input.dispatchEvent(new Event('input', { bubbles:true }));
+  }, frame);
+  await page.waitForFunction(index => {
+    const screen = document.querySelector('#screen');
+    return screen.dataset.target === String(index) && screen.dataset.presented === String(index);
+  }, frame, { timeout:5000 }).catch(async original => {
+    const state = await page.evaluate(() => ({
+      target: document.querySelector('#screen').dataset.target,
+      presented: document.querySelector('#screen').dataset.presented,
+      dialog: document.querySelector('dialog').open,
+      scroll: scrollY,
+      last: window.filmTest.targets.slice(-10),
+    }));
+    throw new Error(`Seek to ${frame} failed: ${JSON.stringify(state)}`, {cause:original});
+  });
+}
+
+async function verifyActions(page, mobile) {
+  const dialog = page.getByRole('dialog');
+  const button = page.locator('.hotspot');
+  const click = el => mobile ? el.tap() : el.click();
+  async function verifyDetail(action) {
+    assert.equal(await dialog.getByRole('heading').textContent(), action.heading);
+    if (action.href) assert.equal(await dialog.getByRole('link').getAttribute('href'), action.href);
+    else assert.equal(await dialog.getByRole('link').count(), 0);
+  }
+  for (const point of manifest.hotspots) {
+    const frame = Math.floor((point.start + point.end) / 2);
+    await seek(page, frame);
+    assert.equal(await button.getAttribute('aria-label'), point.action.label);
+    await click(button);
+    await verifyDetail(point.action);
+    await closeDetail(page, mobile);
+    await page.waitForFunction(() => document.activeElement === document.querySelector('.hotspot'));
+    assert.equal(await stable(page), frame);
+  }
+  const actions = page.getByRole('navigation', {name:'Services'});
+  for (const action of manifest.actions ?? manifest.hotspots.map(point => point.action)) {
+    if (action.href) {
+      const link = actions.getByRole('link', {name:action.label, exact:true});
+      assert.equal(await link.getAttribute('href'), action.href);
+    } else {
+      const shortcut = actions.getByRole('button', {name:action.label, exact:true});
+      const before = await stable(page);
+      await click(shortcut);
+      await verifyDetail(action);
+      await closeDetail(page, mobile);
+      await page.waitForFunction(label => document.activeElement?.textContent === label, action.label);
+      assert.equal(await stable(page), before);
+      assert(await shortcut.evaluate(el => el === document.activeElement));
+    }
+  }
 }
 
 async function verifyReduced(browser) {
@@ -260,11 +334,11 @@ async function verifyReduced(browser) {
   assert.equal(await stable(page),0);
   await page.getByRole('slider',{name:'Position'}).press('End');
   await waitRelative(page,0,'greater');
-  assert.equal(await stable(page),191);
+  assert.equal(await stable(page),manifest.frames - 1);
   await page.getByRole('slider',{name:'Position'}).press('Home');
-  await waitRelative(page,191,'less');
+  await waitRelative(page,manifest.frames - 1,'less');
   assert.equal(await stable(page),0);
-  return {wheel:0,keyboard:[0,191,0]};
+  return {wheel:0,keyboard:[0,manifest.frames - 1,0]};
 }
 
 const launch=()=>playwright.chromium.launch({
