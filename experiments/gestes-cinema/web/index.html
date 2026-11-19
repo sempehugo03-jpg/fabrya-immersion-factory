@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#191714">
+  <title>Résonance · Au tour</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="player.js" type="module"></script>
+</head>
+<body>
+  <a class="skip" href="#progress">Passer au contrôle du film</a>
+  <main>
+    <section class="track" aria-labelledby="title">
+      <div class="pin">
+        <header>
+          <div><p class="signature">Résonance · FABRYA</p><h1 id="title">Au tour</h1></div>
+          <p id="instruction">Défilez pour avancer ou revenir.</p>
+        </header>
+        <div class="screen" id="screen" data-presented="0" data-target="0" aria-busy="true">
+          <picture>
+            <source media="(max-width: 650px)" srcset="media/mobile.webp">
+            <img class="poster" src="media/desktop.webp" fetchpriority="high" alt="Des mains façonnent une pièce d’argile sur un tour de potier.">
+          </picture>
+          <canvas role="img" aria-label="Séquence filmée du façonnage au tour" hidden></canvas>
+          <button type="button" class="hotspot" aria-haspopup="dialog" aria-label="Examiner le façonnage au tour" hidden><span aria-hidden="true"></span></button>
+          <p class="error" role="status" hidden></p>
+        </div>
+        <div class="controls">
+          <label for="progress">Position</label>
+          <input id="progress" type="range" min="0" max="1" value="0" step="1" disabled>
+          <output for="progress" id="position">0 %</output>
+        </div>
+      </div>
+    </section>
+    <footer></footer>
+  </main>
+  <dialog id="detail" aria-labelledby="detail-title">
+    <div class="dialog-head"><h2 id="detail-title">Le façonnage au tour</h2><button type="button" class="close" aria-label="Fermer la fiche" autofocus>×</button></div>
+    <p>Le tour fait tourner l’argile. Les doigts et la paume guident sa forme en exerçant une pression régulière, pendant que l’eau permet aux mains de glisser.</p>
+  </dialog>
+</body>
+</html>
