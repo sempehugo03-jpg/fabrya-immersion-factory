@@ -52,11 +52,23 @@ def generate(args):
     }
     system = BUILD
     phase = "production"
+    if args.retry_incomplete:
+        system += (
+            "\nLe premier code est incomplet : une boucle de classes CSS dupliquées a rempli la réponse."
+            " Mutualise les variations dans des données et du code paramétrique."
+            " Écris la totalité du document fonctionnel sans dupliquer de règles, de blocs ou de fonctions."
+            " Garde tes décisions artistiques et termine chaque balise. Sois concis, même sur les espaces."
+        )
+        phase = "production-reprise"
     if args.review:
         system = REVIEW
         phase = "corrections"
-        payload["observations_navigateur"] = json.loads(args.review.read_text())
-        payload["html_precedent"] = args.site.read_text()
+        payload = {
+            "brief": brief,
+            "invariants": result["vision"]["invariants"],
+            "observations_navigateur": json.loads(args.review.read_text()),
+            "html_precedent": args.site.read_text(),
+        }
     request = {
         "model": args.model,
         "stream": False,
@@ -64,14 +76,19 @@ def generate(args):
         "seed": 31,
         "max_tokens": 4600,
         "messages": [{"role": "system", "content": system},
-                     {"role": "user", "content": json.dumps(payload, ensure_ascii=False)}],
+                     {"role": "user", "content": json.dumps(
+                         payload, ensure_ascii=False, separators=(",", ":")
+                     )}],
     }
-    write_json(directory / f"{phase}-request.json", request)
-    endpoint = f"http://127.0.0.1:{args.port}/v1/chat/completions"
+    if args.retry_incomplete:
+        request["repeat_penalty"] = 1.15
+        request["repeat_last_n"] = 256
+        request["max_tokens"] = 2900
     if args.review:
         request["response_format"] = {"type": "json_object"}
-        request["max_tokens"] = 1500
-        write_json(directory / f"{phase}-request.json", request)
+        request["max_tokens"] = 1100
+    write_json(directory / f"{phase}-request.json", request)
+    endpoint = f"http://127.0.0.1:{args.port}/v1/chat/completions"
     with urlopen(Request(endpoint, data=json.dumps(request).encode(),
                          headers={"Content-Type": "application/json"}), timeout=1200) as response:
         output = json.load(response)
@@ -103,6 +120,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("exploration", "brief", "evidence", "site", "review"):
         parser.add_argument(f"--{name}", type=Path, required=name != "review")
+    parser.add_argument("--retry-incomplete", action="store_true")
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--model", required=True)
     generate(parser.parse_args())
