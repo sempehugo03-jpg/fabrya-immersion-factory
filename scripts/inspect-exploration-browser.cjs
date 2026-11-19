@@ -30,6 +30,10 @@ async function inspect(browser, name, config) {
     return page.evaluate(() => ({
       title: document.title,
       scrollY,
+      transforms: ['#wheel', '#hand'].map(selector => {
+        const element = document.querySelector(selector);
+        return element ? getComputedStyle(element).transform : null;
+      }),
       viewport: [innerWidth, innerHeight],
       document: [document.documentElement.scrollWidth, document.documentElement.scrollHeight],
       headings: [...document.querySelectorAll('h1,h2')].map(el => el.textContent.trim()),
@@ -57,19 +61,32 @@ async function inspect(browser, name, config) {
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
     await pause(400);
     steps.apres_glissement_tactile = await state();
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y: 280 }] });
+    for (let y = 310; y <= 650; y += 20) {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y }] });
+      await pause(35);
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await pause(600);
+    steps.apres_glissement_inverse = await state();
   } else {
     await page.mouse.move(config.viewport.width * .70, config.viewport.height * .53);
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < 14; i++) {
       await page.mouse.wheel(0, 110);
       await pause(130);
     }
+    await pause(500);
     steps.apres_molette_bas = await state();
     await pause(550);
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < 14; i++) {
       await page.mouse.wheel(0, -110);
       await pause(130);
     }
+    await pause(600);
     steps.apres_molette_haut = await state();
+    for (let i = 0; i < 12; i++) await page.keyboard.press('ArrowUp');
+    await pause(600);
+    steps.apres_clavier = await state();
   }
   const buttons = page.locator('button:visible');
   const clickCount = Math.min(await buttons.count(), 6);

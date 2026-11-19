@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>L'Horloge de Temps Perdu</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        :root {
+            --color-wood: #b38864;
+            --color-gold: #d4af37;
+            --color-slate: #f0e68c;
+            --color-dark: #4a3a2d;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+            font-family: 'Georgia', serif;
+            background: #000;
+            color: var(--color-dark);
+        }
+
+        #horloge-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            perspective: 1000px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .horloge-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            transform-style: preserve-3d;
+            transition: transform 0.3s ease;
+            cursor: pointer;
+        }
+
+        .horloge-face::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: radial-gradient(circle at center, var(--color-wood) 0%, var(--color-slate) 70%);
+            opacity: 0.3;
+            pointer-events: none;
+        }
+
+        .horloge-wheel {
+            position: absolute;
+            width: 80%;
+            height: 80%;
+            top: 10%;
+            left: 10%;
+            background: var(--color-gold);
+            border-radius: 50%;
+            box-shadow: 0 0 20px rgba(212, 175, 55, 0.4);
+            transform-origin: 50% 50%;
+            transition: transform 0.3s ease;
+        }
+
+        .horloge-wheel::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 40%;
+            height: 40%;
+            background: var(--color-dark);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            opacity: 0.2;
+        }
+
+        .horloge-hand {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: var(--color-dark);
+            border-radius: 50%;
+            transform-origin: 50% 100%;
+            transform: rotateY(0deg) rotateX(45deg);
+            transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        .horloge-hand::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 10%;
+            height: 10%;
+            background: var(--color-gold);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 10px rgba(212, 175, 55, 0.6);
+        }
+
+        .horloge-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 3em;
+            font-weight: bold;
+            color: var(--color-gold);
+            text-shadow: 0 0 10px rgba(212, 175, 55, 0.8);
+            z-index: 10;
+            pointer-events: none;
+            opacity: 0.9;
+        }
+
+        .horloge-interaction {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            background: rgba(212, 175, 55, 0.9);
+            border: 2px solid var(--color-gold);
+            border-radius: 25px;
+            font-size: 1.2em;
+            font-weight: bold;
+            color: var(--color-dark);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 15px rgba(212, 175, 55, 0.4);
+            z-index: 20;
+        }
+
+        .horloge-interaction:hover {
+            background: rgba(212, 175, 55, 1);
+            transform: translateX(-50%) scale(1.05);
+            box-shadow: 0 0 25px rgba(212, 175, 55, 0.6);
+        }
+
+        .horloge-interaction:active {
+            transform: translateX(-50%) scale(0.95);
+        }
+
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            .horloge-text {
+                font-size: 2em;
+            }
+            .horloge-interaction {
+                padding: 10px 20px;
+                font-size: 1em;
+            }
+        }
+
+        /* Accessibility labels */
+        .visually-hidden {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0,0,0,0);
+            white-space: nowrap;
+            border: 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="horloge-container">
+        <div class="horloge-face" id="horloge-face">
+            <div class="horloge-wheel" id="wheel"></div>
+            <div class="horloge-hand" id="hand"></div>
+            <div class="horloge-text" id="text" role="status">FABRYA</div>
+            <button type="button" class="horloge-interaction" id="interact" aria-label="Découvrir l'histoire de FABRYA">
+                Découvrir l'histoire
+            </button>
+        </div>
+    </div>
+
+    <p style="position:fixed;top:12px;left:16px;z-index:30;margin:0;padding:5px 8px;background:#222;color:#fff;font:14px/1.4 system-ui">Démonstration fictive</p>
+
+    <script>
+        (() => {
+        // Éviter les erreurs de null
+        const container = document.getElementById('horloge-container');
+        if (!container) throw new Error('Container not found');
+
+        const face = document.getElementById('horloge-face');
+        if (!face) throw new Error('Horloge face not found');
+
+        const wheel = document.getElementById('wheel');
+        const hand = document.getElementById('hand');
+        const text = document.getElementById('text');
+        const interact = document.getElementById('interact');
+
+        if (!wheel || !hand || !text || !interact) {
+            console.error('Éléments du DOM manquants');
+            return;
+        }
+
+        let time = 0;
+        const maxTime = 10;
+        const duration = 1500;
+
+        // Mise en place des interactions
+        interact.addEventListener('click', () => {
+            const direction = 'past';
+            navigate(direction);
+        });
+
+        // Gestion de la molette (desktop)
+        document.body.addEventListener('wheel', (e) => {
+            if (e.deltaY > 0) {
+                time = Math.min(time + 0.1, maxTime);
+            } else {
+                time = Math.max(time - 0.1, -maxTime);
+            }
+            update();
+        });
+
+        // Gestion du glissement tactile (mobile)
+        let touchStart = 0;
+        let touchStartY = 0;
+
+        container.addEventListener('touchstart', (e) => {
+            touchStart = e.touches[0].clientY;
+            touchStartY = touchStart;
+        });
+
+        container.addEventListener('touchmove', (e) => {
+            if (e.touches.length === 1) {
+                const touchY = e.touches[0].clientY;
+                const deltaY = touchStartY - touchY;
+                if (deltaY > 10) {
+                    time = Math.min(time + 0.1, maxTime);
+                } else if (deltaY < -10) {
+                    time = Math.max(time - 0.1, -maxTime);
+                }
+                update();
+            }
+        });
+
+        // Boutons clavier (optionnels)
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowUp') {
+                time = Math.min(time + 0.1, maxTime);
+                update();
+            } else if (e.key === 'ArrowDown') {
+                time = Math.max(time - 0.1, -maxTime);
+                update();
+            }
+        });
+
+        function update() {
+            // Rotation du rouage (temps passé)
+            wheel.style.transform = `rotateY(${time * 360}deg) rotateX(45deg)`;
+            hand.style.transform = `rotateY(${time * 360}deg) rotateX(45deg)`;
+
+            // Texte dynamique selon le temps
+            const phase = Math.abs(time) < 1 ? 'Origine' :
+                          Math.abs(time) < 3 ? 'Évolution' :
+                          Math.abs(time) < 5 ? 'Innovation' :
+                          'Futur';
+
+            text.textContent = `FABRYA - ${phase}`;
+
+            // Animation de l'horloge
+            if (time > 0) {
+                wheel.style.boxShadow = '0 0 30px rgba(212, 175, 55, 0.6)';
+                hand.style.boxShadow = '0 0 20px rgba(212, 175, 55, 0.4)';
+            } else {
+                wheel.style.boxShadow = '0 0 30px rgba(179, 136, 100, 0.6)';
+                hand.style.boxShadow = '0 0 20px rgba(179, 136, 100, 0.4)';
+            }
+        }
+
+        function navigate(direction) {
+            if (direction === 'past') {
+                time = -maxTime;
+                update();
+                setTimeout(() => {
+                    time = 0;
+                    update();
+                }, 1500);
+            }
+        }
+
+        // Initialisation
+        update();
+
+        // Ajout de son (optionnel, actif par le visiteur)
+        // <audio id="sound" src="..." preload="auto"></audio>
+        // (Son non intégré car non disponible, mais le visiteur peut l'activer)
+
+        // Informations de démonstration
+        // L'expérience est fictive. Les horloges FABRYA ne sont pas réelles.
+        // L'histoire est une création artistique inspirée de l'horlogerie.
+        })();
+    </script>
+</body>
+</html>

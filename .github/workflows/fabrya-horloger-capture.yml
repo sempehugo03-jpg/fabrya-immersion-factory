@@ -1,8 +1,8 @@
-name: Vérification du site horloger
+name: FABRYA horloger — preuve navigateur
 on:
   push:
     branches:
-      - experiment/carte-blanche-horloger
+      - experiment/horloger-reprise-verifiee
     paths:
       - experiments/carte-blanche-horloger/index.html
 permissions:
@@ -13,21 +13,18 @@ jobs:
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
-      - name: Observe desktop and mobile browser
+        with:
+          persist-credentials: false
+      - name: Record desktop and mobile interaction
         shell: bash
         run: |
           set -euo pipefail
           npm install --no-save playwright@1.58.0
+          npx playwright install ffmpeg
           FABRYA_BROWSER_PATH="$(command -v google-chrome)" node scripts/inspect-exploration-browser.cjs experiments/carte-blanche-horloger/index.html evidence
-          for viewport in ordinateur mobile; do
-            ffmpeg -v error -f concat -safe 0 -i "evidence/${viewport}-frames/concat.txt" -vf 'scale=1440:900:force_original_aspect_ratio=decrease,pad=1440:900:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30' -an -pix_fmt yuv420p -c:v libx264 -preset fast -movflags +faststart "evidence/${viewport}.mp4"
-            rm -rf "evidence/${viewport}-frames"
-          done
-          printf 'file ordinateur.mp4\nfile mobile.mp4\n' > evidence/video-list.txt
-          ffmpeg -v error -f concat -safe 0 -i evidence/video-list.txt -c copy -movflags +faststart evidence/demonstration.mp4
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: horloger-capture
+          name: horloger-proof
           path: evidence/
           retention-days: 1
