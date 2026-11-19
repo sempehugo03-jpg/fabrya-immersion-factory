@@ -6,7 +6,7 @@ import tempfile
 import unittest
 
 from cinema_factory.contracts import AXES, Blocked, Rejected, validate_plan
-from cinema_factory.director import compile_direction, media_cost, similarities
+from cinema_factory.director import compile_direction, directing_schema, media_cost, similarities
 from cinema_factory.inspection import constrain_revision, correction_scope, normalize_review
 from cinema_factory.local_model import local_speaker
 from cinema_factory.prompting import check_prompt, video_request
@@ -178,6 +178,21 @@ class ReviewContractTests(unittest.TestCase):
         del review["axes"]["photoréalisme"]
         with self.assertRaises(Rejected):
             normalize_review(review, plan)
+
+
+class ProviderInventoryContractTests(unittest.TestCase):
+    def test_generation_ids_are_limited_to_the_inventory(self):
+        schema = directing_schema("cinematic", {"fal-text": ROUTES["fal-text"]}, {}, {"contact": "mailto:a@example.test"})
+        fields = schema["properties"]
+        shot = fields["shots"]["items"]["properties"]
+        self.assertEqual(shot["route"]["enum"], ["fal-text"])
+        self.assertEqual(shot["asset_id"]["enum"], [""])
+        self.assertEqual(shot["trim_start"]["enum"], [0])
+        self.assertEqual(fields["actions"]["items"]["properties"]["destination_id"]["enum"], ["", "contact"])
+
+    def test_a_revision_can_propose_a_nonzero_trim(self):
+        schema = directing_schema("cinematic", {"fal-text": ROUTES["fal-text"]}, {}, {}, editing=True)
+        self.assertNotIn("enum", schema["properties"]["shots"]["items"]["properties"]["trim_start"])
 
 
 class EndToEndContractTests(unittest.TestCase):
