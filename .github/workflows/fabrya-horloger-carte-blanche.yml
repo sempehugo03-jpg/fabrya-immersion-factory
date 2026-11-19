@@ -1,0 +1,57 @@
+name: FABRYA — Carte blanche horloger
+on:
+  push:
+    branches: [trial/horloger-carte-blanche]
+    paths:
+      - .github/workflows/fabrya-horloger-carte-blanche.yml
+permissions:
+  contents: read
+jobs:
+  build:
+    if: github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 24
+    env:
+      FABRYA_LOCAL_MODEL: fabrya-local-qwen-7b-q3-k-m
+      FABRYA_BROWSER_EVIDENCE: '1'
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Prepare public model and runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/fabrya-model" fabrya-run
+          curl -fsSL --retry 2 --max-time 240 https://github.com/ggml-org/llama.cpp/releases/download/b12532/llama-b12532-bin-ubuntu-x64.tar.gz -o "$RUNNER_TEMP/llama.tar.gz"
+          tar -xzf "$RUNNER_TEMP/llama.tar.gz" -C "$RUNNER_TEMP/fabrya-model"
+          curl -fsSL --retry 2 --max-time 420 https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF/resolve/bb5d59e/qwen2.5-7b-instruct-q3_k_m.gguf -o "$RUNNER_TEMP/fabrya-model/model.gguf"
+          sha256sum "$RUNNER_TEMP/fabrya-model/model.gguf" > fabrya-run/model-sha256.txt
+          npm install --no-save playwright@1.57.0
+      - name: Run the exact brief and collect browser observations
+        shell: bash
+        run: |
+          set -euo pipefail
+          export FABRYA_RUN_DIRECTORY="$PWD/fabrya-run"
+          export FABRYA_CHROMIUM="$(command -v google-chrome || command -v chromium)"
+          export PYTHONPATH="$PWD"
+          printf '%s\n' 'Tu es un horloger et tu dois me créer un putain de site immersif.' > fabrya-run/brief.txt
+          server="$(find "$RUNNER_TEMP/fabrya-model" -type f -name llama-server -print -quit)"
+          "$server" -m "$RUNNER_TEMP/fabrya-model/model.gguf" --alias "$FABRYA_LOCAL_MODEL" --host 127.0.0.1 --port 18821 -c 11000 -t 4 -np 1 > fabrya-run/llama.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 60); do
+            curl -fsS -m 2 http://127.0.0.1:18821/health >/dev/null 2>&1 && break
+            kill -0 "$server_pid" || { tail -20 fabrya-run/llama.log; exit 2; }
+            sleep 1
+          done
+          python3 -m cinema_factory explore fabrya-run/brief.txt --out fabrya-run/exploration --production-cap-microusd 0 --local-url http://127.0.0.1:18821 --local-model "$FABRYA_LOCAL_MODEL"
+          python3 experiments/horloger-carte-blanche/produce.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fabrya-horloger-execution
+          path: fabrya-run
+          retention-days: 1
+          if-no-files-found: warn

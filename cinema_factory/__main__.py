@@ -1,6 +1,7 @@
 """Run an audited brief, or assemble footage from an explicitly supplied plan."""
 import argparse
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -295,6 +296,12 @@ def launch_exploration(args, run):
             "providers_with_verified_funds": [provider for provider in funds if provider != "openai"],
             "local_executables": {name: bool(path) for name, path in availability["executables"].items()},
             "hypothetical_budget_microusd": args.production_cap_microusd,
+            "local_production": {
+                "blender": bool(shutil.which("blender")),
+                "browser_programmable": bool(shutil.which("chromium")),
+                "browser_formats": ["HTML", "CSS", "JavaScript", "Canvas", "WebGL"],
+                "local_text_inference": bool(args.local_url),
+            },
         }
 
     explore(speaker, run, brief, comparison, production_context, divergence=not args.no_divergence)
