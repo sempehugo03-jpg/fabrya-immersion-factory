@@ -37,23 +37,29 @@ def unique_fields(pairs):
 
 def local_json_speaker(url, model):
     def speak(run, stage, instructions, schema, content):
-        preserved = os.environ.get("FABRYA_REUSE_EXPLORATION")
-        if stage == "unrestricted_exploration" and preserved:
-            original = Path(preserved)
+        checkpoint = os.environ.get("FABRYA_REUSE_EXPLORATION")
+        if checkpoint and stage in {"unrestricted_exploration", "artistic_selection", "unrestricted_exploration_divergence"}:
+            original = Path(checkpoint)
             request_name = f"{stage}-request.json"
             if (original / request_name).read_bytes() != (run.directory / request_name).read_bytes():
-                raise Rejected("Preserved exploration request does not match")
+                raise Rejected("Preserved stage request does not match")
             response_name = f"{stage}-transport-response-1.json"
             raw = (original / response_name).read_bytes()
             response = json.loads(raw)
             if response.get("model") != model:
-                raise Rejected("Preserved exploration used a different model")
-            output = json.loads(response["choices"][0]["message"]["content"])
+                raise Rejected("Preserved stage used a different model")
+            choice = response["choices"][0]
+            if choice["finish_reason"] != "stop":
+                raise Rejected("Preserved stage was incomplete")
+            output = json.loads(choice["message"]["content"], object_pairs_hook=unique_fields)
             validate(schema, output)
+            if output != json.loads((original / f"{stage}.json").read_text()):
+                raise Rejected("Preserved stage differs from its validated checkpoint")
             for name in (response_name, f"{stage}-transport-request-1.json"):
                 (run.directory / name).write_bytes((original / name).read_bytes())
-            run.record("model_inference", "replayed_verified_response", model=model,
+            run.record("model_inference", "replayed_verified_response", phase=stage, model=model,
                        response_sha256=hashlib.sha256(raw).hexdigest(), charged_microusd=0)
+            print(f"{stage}: verified checkpoint", flush=True)
             return output
         stage_request = {
             "model": model, "stream": False, "temperature": .32, "seed": 19,
@@ -66,7 +72,7 @@ def local_json_speaker(url, model):
         }
         wire = run.directory / f"{stage}-transport-request.json"
         fast = os.environ.get("FABRYA_FAST_JSON") == "1"
-        assignment = fast and stage.startswith("artistic_selection")
+        assignment = stage.startswith("artistic_selection")
         wire_schema = copy.deepcopy(schema)
         if assignment:
             properties = wire_schema["properties"]
@@ -85,7 +91,7 @@ def local_json_speaker(url, model):
         shape = describe_shape(wire_schema)
         previous_failure = ""
         for attempt, seed in enumerate((23, 29, 37), 1):
-            if fast:
+            if fast or assignment:
                 stage_request.pop("response_format", None)
                 guidance = (
                     "\nRetourne un objet JSON brut avec les valeurs demandées et les clés de la forme suivante."
@@ -102,12 +108,13 @@ def local_json_speaker(url, model):
                           " Renseigne chaque ID, y compris les pistes écartées. selected est indépendant des groupes.\n"
                     )
                 stage_request["messages"][0]["content"] = instructions + guidance + shape + previous_failure
-            else:
+            if not fast:
                 stage_request["response_format"] = {
                     "type": "json_schema",
-                    "json_schema": {"name": stage, "strict": True, "schema": schema},
+                    "json_schema": {"name": stage, "strict": True, "schema": wire_schema},
                 }
             stage_request["seed"] = seed
+            print(f"{stage}: attempt {attempt}", flush=True)
             write_json(wire.with_name(f"{wire.stem}-{attempt}.json"), stage_request)
             result = request_json(url.rstrip("/") + "/v1/chat/completions", headers={}, timeout=480,
                                   payload=stage_request)
