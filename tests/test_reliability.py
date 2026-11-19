@@ -65,6 +65,16 @@ class KnownCreativeDefects(unittest.TestCase):
         self.assertEqual(direction["shots"][0]["reference_id"], direction["references"][0]["id"])
         self.assertTrue(self.compile()["shots"][0]["reference_prompt"])
 
+    def test_runway_uses_the_directors_compact_treatment_when_needed(self):
+        shot = self.candidate["shots"][0]
+        concise = "Le même cuir brun se plie sous une lumière rasante. Bref trajet latéral, bord lisible au centre."
+        shot.update(option="runway-text/720p/4", compact_prompt=concise)
+        shot["direction"]["camera"] = "déplacement latéral " * 60
+        self.assertEqual(video_request(self.compile()["shots"][0])[1]["promptText"], concise)
+        shot["compact_prompt"] = "🌱" * 501
+        with self.assertRaisesRegex(Rejected, "character contract"):
+            self.compile()
+
     def test_two_plans_cannot_leave_a_contradictory_shared_boundary(self):
         second = deepcopy(self.candidate["shots"][0])
         self.candidate["shots"].append(second)
