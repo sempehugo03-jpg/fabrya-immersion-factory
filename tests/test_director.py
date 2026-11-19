@@ -5,9 +5,9 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from cinema_factory.contracts import Blocked, Rejected, validate_plan
+from cinema_factory.contracts import AXES, Blocked, Rejected, validate_plan
 from cinema_factory.director import compile_direction, media_cost, similarities
-from cinema_factory.inspection import constrain_revision, correction_scope
+from cinema_factory.inspection import constrain_revision, correction_scope, normalize_review
 from cinema_factory.local_model import local_speaker
 from cinema_factory.prompting import check_prompt, video_request
 from cinema_factory.providers import ROUTES, media_fingerprint
@@ -162,6 +162,22 @@ class FinanceTests(unittest.TestCase):
     def test_local_bench_refuses_non_loopback(self):
         with self.assertRaisesRegex(Rejected, "loopback"):
             local_speaker("https://example.test", "qwen2.5")
+
+
+class ReviewContractTests(unittest.TestCase):
+    def test_each_axis_has_an_observation_and_failed_axes_have_linked_diagnoses(self):
+        plan = json.loads(REFERENCE.read_text())
+        review = {"axes": {axis: dict(grade="PASS", shot=0, time=4, evidence="Image observée.",
+                                    scope="stop", confidence="medium", correction="")
+                           for axis in AXES}, "limitations": []}
+        review["axes"]["composition"].update(grade="REVISE", scope="reframe", correction="Décaler le cadre.")
+        result = normalize_review(review, plan)
+        self.assertEqual([row["axis"] for row in result["axes"]], list(AXES))
+        self.assertEqual(correction_scope(result)["scopes"], ["reframe"])
+        self.assertEqual(result["diagnoses"][0]["time"], 4)
+        del review["axes"]["photoréalisme"]
+        with self.assertRaises(Rejected):
+            normalize_review(review, plan)
 
 
 class EndToEndContractTests(unittest.TestCase):
