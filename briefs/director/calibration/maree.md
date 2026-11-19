@@ -1,0 +1,1 @@
+À Marée Douce est une coopérative littorale fictive qui organise des sorties d'observation des oiseaux pour des débutants. Le site doit éveiller l'attention à la distance et au silence, puis aider à préparer une sortie. Aucun lieu précis, accès, tarif ou calendrier n'est fourni.

@@ -69,11 +69,13 @@ def validate(schema, value, path="contract"):
         for key, child in schema["properties"].items():
             validate(child, value[key], f"{path}.{key}")
     if kind == "array":
+        if not schema.get("minItems", 0) <= len(value) <= schema.get("maxItems", len(value)):
+            raise Rejected(f"{path}: invalid list size")
         for index, item in enumerate(value):
             validate(schema["items"], item, f"{path}[{index}]")
 
 
-def validate_plan(plan, routes, assets, destinations):
+def validate_plan(plan, routes, assets, destinations, *, allow_generated_trim=False):
     validate(PLAN, plan)
     concepts = plan["concepts"]
     if not 2 <= len(concepts) <= 5 or not 0 <= plan["selected"] < len(concepts):
@@ -99,21 +101,18 @@ def validate_plan(plan, routes, assets, destinations):
         if shot["route"] == "client":
             if shot["asset_id"] not in assets or not 0 <= shot["trim_start"] <= 3600:
                 raise Rejected("Client footage must be declared with valid in/out points")
-        elif shot["asset_id"] or shot["trim_start"] != 0 or not 1 <= len(shot["video_prompt"]) <= 1000:
+        elif shot["asset_id"] or not 0 <= shot["trim_start"] <= 24 or (
+            shot["trim_start"] != 0 and not allow_generated_trim
+        ):
             raise Rejected("Generated shots require a prompt and no client trim or asset ID")
+        if shot["route"] != "client":
+            from .prompting import check_prompt
+            check_prompt(shot["route"], shot["video_prompt"])
         if shot["route"] == "fal-reference" and not shot["reference_prompt"].strip():
             raise Rejected("The reference-to-video route requires a reference prompt")
     if not 0 <= plan["mobile_center"] <= 1:
         raise Rejected("Mobile crop center must be normalized")
-    actions = plan["actions"]
-    ids = {a["id"] for a in actions}
-    if not 1 <= len(actions) <= 4 or len(ids) != len(actions) or "" in ids:
-        raise Rejected("Provide one to four uniquely identified business actions")
-    for action in actions:
-        if not all(action[k].strip() for k in ("label", "heading", "body")):
-            raise Rejected("Business actions require a label, heading and useful content")
-        if action["destination_id"] and action["destination_id"] not in destinations:
-            raise Rejected("Action references a destination absent from trusted configuration")
+    ids = validate_actions(plan["actions"], destinations)
     if not 1 <= len(plan["hotspots"]) <= 8:
         raise Rejected("Provide one to eight synchronized interactions")
     intervals = []
@@ -129,6 +128,18 @@ def validate_plan(plan, routes, assets, destinations):
                for i, start, end in intervals):
             raise Rejected("Consecutive hotspots must not overlap")
         intervals.append((index, point["start"], point["end"]))
+
+
+def validate_actions(actions, destinations):
+    ids = {a["id"] for a in actions}
+    if not 1 <= len(actions) <= 4 or len(ids) != len(actions) or "" in ids:
+        raise Rejected("Provide one to four uniquely identified business actions")
+    for action in actions:
+        if not all(action[k].strip() for k in ("label", "heading", "body")):
+            raise Rejected("Business actions require a label, heading and useful content")
+        if action["destination_id"] and action["destination_id"] not in destinations:
+            raise Rejected("Action references a destination absent from trusted configuration")
+    return ids
 
 
 def validate_destination(url):

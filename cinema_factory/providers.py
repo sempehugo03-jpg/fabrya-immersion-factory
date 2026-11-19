@@ -1,4 +1,5 @@
 """Model selection inventory and real HTTP adapters."""
+from hashlib import sha256
 import json
 import os
 import re
@@ -7,9 +8,10 @@ from urllib.parse import urlsplit
 
 from .contracts import Blocked, Rejected, validate
 from .runtime import download, request_json
+from .prompting import video_request
 
 MODEL = "gpt-6.1-sol"
-REASONING_RESERVATION = 64_000 * 2 + 8_000 * 10
+REASONING_RESERVATION = 64_000 * 5 + 8_000 * 10
 FAL = "https://queue.fal.run"
 RUNWAY = "https://api.dev.runwayml.com"
 OPENAI = "https://api.openai.com/v1/responses"
@@ -64,7 +66,16 @@ def speak(run, stage, instructions, schema, content):
     usage = result.get("usage")
     if not usage:
         raise Blocked("OpenAI did not report token usage")
-    run.settle(ledger, usage["input_tokens"] * 2 + usage["output_tokens"] * 10,
+    detail = usage.get("input_tokens_details") or {}
+    cached = detail.get("cached_tokens", 0) or 0
+    writes = detail.get("cache_write_tokens_details") or {}
+    short_writes = writes.get("ttl_30m_tokens", 0) or 0
+    long_writes = writes.get("ttl_12h_tokens", 0) or 0
+    uncached = max(0, usage["input_tokens"] - cached - short_writes - long_writes)
+    # Round up in microdollars. A cache write replaces the normal input charge.
+    price_tenths = (uncached * 20 + cached + short_writes * 25 + long_writes * 50
+                   + usage["output_tokens"] * 100)
+    run.settle(ledger, (price_tenths + 9) // 10,
                model=result["model"], request_id=result["id"], tokens=usage)
     output = [part["text"] for item in result.get("output", []) if item["type"] == "message"
               for part in item["content"] if part["type"] == "output_text"]
@@ -90,10 +101,13 @@ def queue_url(url):
     return url
 
 
+def media_fingerprint(provider, endpoint, payload):
+    return sha256(json.dumps([provider, endpoint, payload], sort_keys=True).encode()).hexdigest()
+
 def fal_job(run, operation, endpoint, payload, estimate):
     key = os.environ["FAL_KEY"].strip()
     headers = {"Authorization": f"Key {key}"}
-    charge = run.reserve("fal", operation, estimate)
+    charge = run.reserve("fal", operation, estimate, fingerprint=media_fingerprint("fal", endpoint, payload))
     result = request_json(f"{FAL}/{endpoint}", headers=headers, payload=payload)
     status, output = map(queue_url, (result["status_url"], result["response_url"]))
     charge.update(request_id=result["request_id"], endpoint=endpoint, status_url=status, response_url=output)
@@ -116,11 +130,9 @@ def runway_job(run, shot):
     key = os.environ["RUNWAYML_API_SECRET"].strip()
     headers = {"Authorization": f"Bearer {key}", "X-Runway-Version": "2024-11-06"}
     estimate = planned_charge(shot)
-    charge = run.reserve("runway", "video", estimate)
-    result = request_json(f"{RUNWAY}/v1/text_to_video", headers=headers, payload={
-        "model": "gen4.5", "promptText": shot["video_prompt"], "ratio": "1280:720",
-        "duration": shot["seconds"],
-    })
+    endpoint, payload = video_request(shot)
+    charge = run.reserve("runway", "video", estimate, fingerprint=media_fingerprint("runway", endpoint, payload))
+    result = request_json(f"{RUNWAY}/v1/text_to_video", headers=headers, payload=payload)
     request_id = result["id"]
     if not re.fullmatch(r"[\w-]+", request_id):
         raise Rejected("Unexpected Runway task ID")
@@ -137,27 +149,29 @@ def runway_job(run, shot):
     raise Blocked("Runway timed out; inspect the saved task ID before any resubmission")
 
 
-def produce(run, shot, target):
+def produce(run, shot, target, references=None):
     route = shot["route"]
     if route == "runway-text":
         url = runway_job(run, shot)
         download(url, target, ("runwayml.com", "runwayml.cloud", "dnznrvs05pmza.cloudfront.net"))
         return
-    payload = {"prompt": shot["video_prompt"], "resolution": shot["resolution"],
-               "duration": shot["seconds"]}
+    reference = None
     if route == "fal-reference":
-        response = fal_job(run, "reference", "fal-ai/flux/schnell", {
-            "prompt": shot["reference_prompt"], "image_size": {"width": 1280, "height": 720},
-            "num_images": 1, "output_format": "jpeg",
-        }, REFERENCE)
-        if any(response.get("has_nsfw_concepts", [])):
-            raise Rejected("fal did not produce an approved reference image")
-        reference = response["images"][0]["url"]
-        download(reference, target.with_suffix(".reference.jpg"), ("fal.media", "fal.ai"))
-        endpoint = "kling/v4/image-to-video"
-        payload["start_image_url"] = reference
-    else:
-        endpoint = "kling/v4/text-to-video"
-        payload["aspect_ratio"] = "16:9"
+        references = references if references is not None else {}
+        reference_prompt = shot["reference_prompt"]
+        reference = references.get(reference_prompt)
+        if reference is None:
+            response = fal_job(run, "reference", "fal-ai/flux/schnell", {
+                "prompt": reference_prompt, "image_size": {"width": 1280, "height": 720},
+                "num_images": 1, "output_format": "jpeg",
+            }, REFERENCE)
+            if any(response.get("has_nsfw_concepts", [])):
+                raise Rejected("fal did not produce an approved reference image")
+            reference = response["images"][0]["url"]
+            download(reference, target.with_suffix(".reference.jpg"), ("fal.media", "fal.ai"))
+            references[reference_prompt] = reference
+        else:
+            run.record("reference", "reused", target=target.name)
+    endpoint, payload = video_request(shot, reference)
     response = fal_job(run, "video", endpoint, payload, VIDEO_RATES[(route, shot["resolution"])] * shot["seconds"])
     download(response["video"]["url"], target, ("fal.media", "fal.ai"))

@@ -1,0 +1,1 @@
+Onde Claire est un studio fictif de traitement acoustique pour petites salles de répétition. Les musiciens viennent surtout comprendre pourquoi ils s'entendent mal quand ils jouent ensemble. L'objectif du site est de leur faire préparer une première conversation sur la pièce et leurs usages. Aucun produit précis, mesure ni devis n'est fourni.

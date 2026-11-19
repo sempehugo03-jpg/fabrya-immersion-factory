@@ -1,0 +1,1 @@
+Mue est un studio fictif qui adapte des manteaux existants à de nouveaux usages. Le public veut garder un vêtement auquel il tient tout en le portant autrement. Le site doit faciliter une première conversation sur les usages, sans promettre de transformation précise.

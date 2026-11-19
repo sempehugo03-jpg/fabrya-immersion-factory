@@ -1,0 +1,1 @@
+Lisière est une papeterie fictive qui fabrique de petites séries de carnets destinés aux personnes qui dessinent en voyage. Elle veut aider ses visiteurs à choisir le type de carnet adapté à leur pratique et à préparer leurs questions. Les formats, stocks, ingrédients du papier et tarifs ne sont pas confirmés.

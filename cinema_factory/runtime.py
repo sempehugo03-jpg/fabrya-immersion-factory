@@ -6,7 +6,7 @@ import re
 import shutil
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlsplit
 
 from .contracts import Blocked, Rejected
@@ -22,6 +22,26 @@ def digest(path):
     with path.open("rb") as source:
         return hashlib.file_digest(source, "sha256").hexdigest()
 
+def read_funds(path):
+    if path is None:
+        raise Blocked("A fresh balance verification is required before paid requests")
+    data = json.loads(path.read_text())
+    if not isinstance(data, dict) or not data:
+        raise Rejected("Expected verified provider balances")
+    for provider, row in data.items():
+        if provider not in {"openai", "fal", "runway"}:
+            raise Rejected("Unrecognized funding provider")
+        if set(row) != {"checked_at", "currency", "verification", "automatic_recharge", "available_microusd"}:
+            raise Rejected("Provider balance attestation has unexpected fields")
+        checked = datetime.fromisoformat(row["checked_at"])
+        now = datetime.now(timezone.utc)
+        if (checked.tzinfo is None or not now - timedelta(hours=1) <= checked <= now
+                or row.get("currency") != "USD" or not row.get("verification", "").strip()
+                or row.get("automatic_recharge") is not False
+                or type(row.get("available_microusd")) is not int or row["available_microusd"] < 0):
+            raise Blocked("Provider funds must be observed within an hour, in USD, without auto reload")
+    return data
+
 
 class Run:
     def __init__(self, directory, cap):
@@ -31,6 +51,7 @@ class Run:
         self.events = []
         self.charges = []
         self.local = {}
+        self.funds = None
         self.record("intake", "started")
 
     @property
@@ -52,11 +73,25 @@ class Run:
             "delivery": "no external deployment or egress billing in this run",
         })
 
-    def reserve(self, provider, operation, estimate):
+    def reserve(self, provider, operation, estimate, *, fingerprint=None):
         if not 0 < estimate <= self.remaining:
             raise Blocked(f"Remaining authorized budget cannot reserve {operation}: {estimate} µUSD")
+        if self.funds is not None:
+            balance = self.funds.get(provider)
+            if not balance:
+                raise Blocked(f"No verified balance for {provider}")
+            checked = datetime.fromisoformat(balance["checked_at"])
+            if datetime.now(timezone.utc) - checked > timedelta(hours=1):
+                raise Blocked(f"Verified balance expired for {provider}")
+            used = sum(item["accounted_microusd"] for item in self.charges if item["provider"] == provider)
+            if used + estimate > balance["available_microusd"]:
+                raise Blocked(f"Verified funds do not cover {provider} {operation}")
+        if fingerprint and any(event.get("fingerprint") == fingerprint for event in self.charges):
+            raise Blocked("This exact media request already has a reservation; resolve the original")
         entry = dict(provider=provider, operation=operation, reserved_microusd=estimate,
                      accounted_microusd=estimate, state="reserved_outcome_unknown")
+        if fingerprint:
+            entry["fingerprint"] = fingerprint
         self.charges.append(entry)
         self.save_costs()
         return entry

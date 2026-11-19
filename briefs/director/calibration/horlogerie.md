@@ -1,0 +1,1 @@
+Heure de Lien est un atelier fictif qui examine des montres héritées et aide leurs propriétaires à décider s'ils souhaitent les faire entretenir. Le site doit inspirer confiance et expliquer ce que le visiteur peut préparer avant un diagnostic. Aucune marque, garantie ou durée n'est confirmée.
