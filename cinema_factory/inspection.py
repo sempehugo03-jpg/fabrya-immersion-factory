@@ -5,6 +5,7 @@ import json
 from .contracts import AXES, INT, NUM, STR, Rejected, array, choice, record, validate
 from .film import command, ffmpeg, probe, structure
 from .runtime import write_json
+from .visual_evidence import capture_frames, check_evidence, ground_review, apply_measured_defects
 
 SCOPES = ("reframe", "edit", "commercial", "player", "prompt", "provider", "continuity", "stop")
 AXIS_REVIEW = record(grade=choice("PASS", "REVISE", "UNVERIFIED"),
@@ -13,8 +14,7 @@ AXIS_REVIEW = record(grade=choice("PASS", "REVISE", "UNVERIFIED"),
                      correction=STR)
 CRITIQUE = record(axes=record(**dict.fromkeys(AXES, AXIS_REVIEW)), limitations=array(STR))
 CRITIC = """
-Tu es le critique indépendant de FABRYA. Observe les planches du vrai film, dans l'ordre,
-deux cadrages par plan, de gauche à droite puis de haut en bas. Les cadrages mobiles sont
+Tu es le critique indépendant de FABRYA. Observe les captures du vrai film et leurs positions, sous deux cadrages par plan. Les cadrages mobiles sont
 ceux utilisés par le lecteur. Les mesures de mouvement photométrique ne prouvent pas la
 parallaxe, la trajectoire ou la stabilité anatomique. Cherche le banal, les mouvements
 sans découverte, la perspective incohérente, les objets, traits, gestes et matières instables,
@@ -61,9 +61,11 @@ def motion_metrics(master, threshold=.004):
     }
 
 
-def inspect_movie(master, plan, work):
+def inspect_movie(master, plan, work, observations=None):
     metadata = probe(master)
     height, width = metadata["height"], metadata["width"]
+    if metadata["rotation"] or width * 9 != height * 16:
+        raise Rejected("Evidence requires the player’s 16:9 master without rotation")
     crop, left, _, _ = structure(plan, {}, height, width)
     timeline = sum(s["seconds"] for s in plan["shots"])
     if abs(timeline - metadata["seconds"]) > .15:
@@ -72,36 +74,32 @@ def inspect_movie(master, plan, work):
     inspection = work / "inspection"
     inspection.mkdir()
     content = []
-    sheets = []
-    start = 0
-    for index, shot in enumerate(plan["shots"]):
-        length = shot["seconds"]
-        for label, filter_prefix in (("desktop", ""), ("mobile", f"crop={crop}:{height}:{left}:0,")):
-            for segment in (0, 1):
-                segment_start = start + segment * length / 2
-                path = inspection / f"shot-{index}-{label}-{segment}.jpg"
-                fps = 8 / length
-                ffmpeg("-ss", segment_start, "-threads", 2, "-i", master,
-                       "-vf", f"{filter_prefix}fps={fps},scale=320:-2,trim=end_frame=4,tile=2x2",
-                       "-an", "-frames:v", "1", "-q:v", "3", "-threads", "2", path)
-                if not path.is_file():
-                    raise Rejected("Could not extract a chronological inspection sheet")
-                caption = (f"Plan {index}, {label}, fenêtre de {segment*length/2:g} "
-                           f"à {(segment+1)*length/2:g} s relatives, 4 vues chronologiques")
-                sheets.append(dict(file=path.name, label=caption))
-                content.extend([
-                    {"type": "input_text", "text": caption},
-                    {"type": "input_image", "detail": "low",
-                     "image_url": "data:image/jpeg;base64," + base64.b64encode(path.read_bytes()).decode()},
-                ])
-        start += length
-    result = dict(master=metadata, motion=signals, mobile_crop={"left": left, "width": crop}, sheets=sheets)
+    frames = capture_frames(master, plan, metadata, crop, left, inspection)
+    defects = check_evidence(frames, plan, inspection, metadata, crop, left, observations)
+    for row in frames:
+        caption = (f"{row['id']} | plan {row['shot']} | {row['time']:.3f} s relatives "
+                   f"| image {row['frame']} | {row['profile']}")
+        content.extend([
+            {"type": "input_text", "text": caption},
+            {"type": "input_image", "detail": "low",
+             "image_url": "data:image/jpeg;base64," + base64.b64encode((inspection / row["file"]).read_bytes()).decode()},
+        ])
+    result = dict(master=metadata, motion=signals, mobile_crop={"left": left, "width": crop},
+                  frames=frames, deterministic_defects=defects,
+                  subject_measurement=observations["origin"] if observations else "unmeasured")
     write_json(work / "inspection.json", result)
     return result, content
 
 
-def evaluate(speak, run, master, brief, plan, work):
-    result, content = inspect_movie(master, plan, work)
+def evaluate(speak, run, master, brief, plan, work, observations=None):
+    result, content = inspect_movie(master, plan, work, observations)
+    if result["deterministic_defects"]:
+        report = apply_measured_defects(
+            dict(axes=[dict(axis=axis, grade="UNVERIFIED", evidence="", fix="") for axis in AXES],
+                 diagnoses=[], limitations=["Vision non sollicitée après un défaut critique mesuré."]),
+            result["deterministic_defects"])
+        write_json(work / "artistic-review.json", report)
+        return report
     # The critic sees the brief, the intended discovery and actual frames. Full prompts
     # are deliberately excluded to reduce anchoring and keep the vision budget bounded.
     context = {
@@ -109,10 +107,22 @@ def evaluate(speak, run, master, brief, plan, work):
         "actions": [item["label"] for item in plan["actions"]], "motion": result["motion"],
         "axes": AXES,
     }
-    review = speak(run, "cinematic_critique", CRITIC, CRITIQUE,
+    frame_schema = record(**AXIS_REVIEW["properties"], frames={
+        **array(choice(*(row["id"] for row in result["frames"]))), "minItems": 1, "maxItems": 3,
+    })
+    schema = record(axes=record(**dict.fromkeys(AXES, frame_schema)), limitations=array(STR))
+    instruction = CRITIC + (
+        " Chaque image est légendée avec son identifiant et sa position. Cite ses IDs dans frames. "
+        "Pour la composition et la cohérence des objets, un PASS exige la paire desktop/mobile "
+        "de la même image. Les plages intermédiaires non observées restent incertaines."
+    )
+    review = speak(run, "cinematic_critique", instruction, schema,
                    [{"type": "input_text", "text": json.dumps(context, ensure_ascii=False)}, *content])
     write_json(work / "artistic-review-model.json", review)
-    report = normalize_review(review, plan)
+    validate(schema, review)
+    base_review = {**review, "axes": {axis: {k: v for k, v in item.items() if k != "frames"}
+                                    for axis, item in review["axes"].items()}}
+    report = ground_review(review, normalize_review(base_review, plan), result["frames"], [])
     write_json(work / "artistic-review.json", report)
     return report
 

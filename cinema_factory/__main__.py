@@ -13,6 +13,8 @@ from .local_model import local_speaker
 from .film import build_site, probe
 from .providers import REASONING_RESERVATION, ROUTES, produce, routes_for, speak
 from .qa import browser_qa, deliver
+from .prompting import production_spec
+from .reliability import CreativeRejection, StagedDirection, assess
 from .runtime import Run, capabilities, digest, read_assets, read_funds, write_json
 
 def parse_args():
@@ -42,6 +44,7 @@ def parse_args():
     inspect.add_argument("master", type=Path)
     inspect.add_argument("--plan", type=Path, required=True)
     inspect.add_argument("--out", type=Path, required=True)
+    inspect.add_argument("--observations", type=Path, help="trusted, source-bound subject measurements")
     inspect.add_argument("--brief", type=Path, help="brief for a local vision critique")
     inspect.add_argument("--local-url", help="loopback URL of a vision-capable llama.cpp server")
     inspect.add_argument("--local-model", default="qwen2.5-vl")
@@ -89,7 +92,17 @@ def launch(args, run):
                 raise Blocked("No verified production route with matching credentials and funds")
     run.record("production_inventory", "completed", enabled=routes, supported=ROUTES,
                hypothetical=design_only)
+    if assets:
+        assets = {key: {**asset, "media": {k: v for k, v in probe(asset["path"]).items() if k != "sha256"}}
+                  for key, asset in assets.items()}
     asset_context = {k: {a: v for a, v in value.items() if a != "path"} for k, value in assets.items()}
+    if planned:
+        write_json(run.directory / "context-boundary.json", {
+            "brief_sha256": digest(args.brief),
+            "history_comparison_only": [digest(path) for path in args.history],
+            "assets": {key: asset["sha256"] for key, asset in assets.items()},
+            "destinations": sorted(destinations), "runtime_mode": "local" if local else "provider",
+        })
     feedback = []
     generated = {}
     references = {}
@@ -105,8 +118,10 @@ def launch(args, run):
                    max(0, run.remaining - REASONING_RESERVATION * (1 if prior else 2)))
             if planned:
                 run.record("creative_plan", "started", attempt=turn + 1)
-                direction = propose(speaker, run, brief, routes, asset_context, destinations, history,
-                                    feedback, offer, cap)
+                proposed = propose(speaker, run, brief, routes, asset_context, destinations, history,
+                                    feedback, offer, cap, work=work)
+                staged = isinstance(proposed, StagedDirection)
+                direction = proposed.direction if staged else proposed
                 write_json(work / "direction.json", direction)
                 write_json(work / "similarity.json", [])
                 plan, comparisons = compile_direction(
@@ -123,6 +138,19 @@ def launch(args, run):
                 minimum = media_cost(new_media, generated, references)
                 if minimum > cap:
                     raise Rejected("Planned media exceeds the declared production envelope")
+                if staged:
+                    dependencies = []
+                    for index, shot in enumerate(plan["shots"]):
+                        if shot["route"] == "client":
+                            dependencies.append(dict(shot=index, supplied_asset=shot["asset_id"]))
+                            continue
+                        spec = production_spec(shot)
+                        reference = direction["shots"][index]["reference_id"]
+                        dependencies.append(dict(shot=index, **spec, prerequisite=reference or None))
+                    write_json(work / "media-dependencies.json", {
+                        "shots": dependencies, "planned_first": direction["references"],
+                    })
+                    assess(speaker, run, work, brief, proposed.ideation, proposed.candidate, direction, minimum)
                 write_json(work / "production-estimate.json", {
                     "video_and_references_microusd": minimum if plan else None,
                     "ceiling_microusd": cap,
@@ -210,7 +238,7 @@ def launch(args, run):
             # After any video or inspection, only an evidence-backed diagnosis can revise.
             if turn == corrections or correction or (work / "master.mp4").exists():
                 raise
-            feedback = [{"reason": str(exc), "defects": feedback}]
+            feedback = [{"reason": str(exc), "rethink_creative": isinstance(exc, CreativeRejection)}]
 
     raise Rejected("No deliverable")
 
@@ -232,14 +260,15 @@ def main():
     try:
         if args.mode == "inspect":
             plan = json.loads(args.plan.read_text())
+            observations = json.loads(args.observations.read_text()) if args.observations else None
             if args.local_url:
                 if not args.brief:
                     raise Rejected("A local vision review needs the original brief")
                 reviewer = local_speaker(args.local_url, args.local_model)
-                review = evaluate(reviewer, run, args.master, args.brief.read_text().strip(), plan, run.directory)
+                review = evaluate(reviewer, run, args.master, args.brief.read_text().strip(), plan, run.directory, observations)
                 write_json(run.directory / "correction-decision.json", correction_scope(review))
             else:
-                inspect_movie(args.master, plan, run.directory)
+                inspect_movie(args.master, plan, run.directory, observations)
             run.record("inspection", "completed", artist_review=bool(args.local_url))
         else:
             launch(args, run)

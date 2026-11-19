@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 
 from .contracts import Blocked, Rejected, validate
 from .runtime import download, request_json
-from .prompting import video_request
+from .prompting import production_spec, video_request
 
 MODEL = "gpt-6.1-sol"
 REASONING_RESERVATION = 64_000 * 5 + 8_000 * 10
@@ -150,6 +150,7 @@ def runway_job(run, shot):
 
 
 def produce(run, shot, target, references=None):
+    production_spec(shot)
     route = shot["route"]
     if route == "runway-text":
         url = runway_job(run, shot)

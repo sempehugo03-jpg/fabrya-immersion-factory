@@ -203,7 +203,10 @@ def directing_schema(offer, routes, assets, destinations, *, editing=False):
     return record(**fields)
 
 
-def propose(speak, run, brief, routes, assets, destinations, history, feedback, offer, production_cap):
+def propose(speak, run, brief, routes, assets, destinations, history, feedback, offer, production_cap, *, work=None):
+    if offer == "cinematic" and work is not None and not any("targeted_correction" in item for item in feedback):
+        from .reliability import develop
+        return develop(speak, run, work, brief, routes, assets, destinations, production_cap, feedback)
     envelope = {k: {**v, "prompt_limit": LIMITS.get(k)} for k, v in routes.items()}
     # Compare with past projects after inference so their subjects cannot prime a new brief.
     context = dict(brief=brief, routes=envelope, assets=assets, destination_ids=list(destinations),

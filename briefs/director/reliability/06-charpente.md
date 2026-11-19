@@ -1,0 +1,1 @@
+Une entreprise reprend des charpentes anciennes pour des propriétaires qui hésitent entre conserver et remplacer. Aucun chantier de référence n'est disponible. Elle veut recevoir une description du bâtiment et du problème constaté.

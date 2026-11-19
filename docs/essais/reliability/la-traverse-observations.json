@@ -1,0 +1,7 @@
+{
+  "master_sha256": "72bf7657b7e490e84fe5864bca7d0354ac7f6471060580251d2e2305cd9e1ef4",
+  "origin": "Mesure manuelle de la transmission sur la capture desktop 320×180, image 105. Bornes approchées x64–280 et y53–176.",
+  "subjects": [
+    {"frame": 105, "subject": "Transmission, du pignon arrière au pédalier", "bbox": [0.2, 0.2944, 0.875, 0.9778], "visible_fraction": 1}
+  ]
+}

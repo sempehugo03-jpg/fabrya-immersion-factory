@@ -56,6 +56,14 @@ class Rejected(Exception):
 
 
 def validate(schema, value, path="contract"):
+    if "anyOf" in schema:
+        for variant in schema["anyOf"]:
+            try:
+                validate(variant, value, path)
+                return
+            except Rejected:
+                continue
+        raise Rejected(f"{path}: no authorized contract variant matches")
     kind = schema["type"]
     types = {"object": (dict,), "array": (list,), "string": (str,),
              "integer": (int,), "number": (int, float)}
@@ -101,13 +109,22 @@ def validate_plan(plan, routes, assets, destinations, *, allow_generated_trim=Fa
         if shot["route"] == "client":
             if shot["asset_id"] not in assets or not 0 <= shot["trim_start"] <= 3600:
                 raise Rejected("Client footage must be declared with valid in/out points")
+            media = assets[shot["asset_id"]].get("media")
+            if media and (media["rotation"] or media["width"] * 9 != media["height"] * 16
+                          or media["height"] < int(shot["resolution"][:-1])
+                          or media["seconds"] + .05 < shot["trim_start"] + shot["seconds"]):
+                raise Rejected("Declared footage cannot cover the requested frame size or time range")
         elif shot["asset_id"] or not 0 <= shot["trim_start"] <= 24 or (
             shot["trim_start"] != 0 and not allow_generated_trim
         ):
             raise Rejected("Generated shots require a prompt and no client trim or asset ID")
         if shot["route"] != "client":
-            from .prompting import check_prompt
-            check_prompt(shot["route"], shot["video_prompt"])
+            from .prompting import production_spec
+            if not allow_generated_trim or not shot["trim_start"]:
+                production_spec(shot)
+            else:
+                from .prompting import check_prompt
+                check_prompt(shot["route"], shot["video_prompt"])
         if shot["route"] == "fal-reference" and not shot["reference_prompt"].strip():
             raise Rejected("The reference-to-video route requires a reference prompt")
     if not 0 <= plan["mobile_center"] <= 1:

@@ -1,0 +1,1 @@
+Terrain Lucide accompagne le réemploi de friches. Ses prestations vont de l'étude des usages au suivi de la remise en état. L'équipe veut recevoir les projets de propriétaires et de communes. Le site ne doit montrer aucun résultat garanti ni aucun chantier réel.

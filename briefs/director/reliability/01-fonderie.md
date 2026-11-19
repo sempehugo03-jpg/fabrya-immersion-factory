@@ -1,0 +1,1 @@
+L'atelier Écho de Bronze restaure des cloches anciennes pour des collectivités. Il accompagne les responsables de patrimoine lorsqu'ils doivent décider s'il faut diagnostiquer, réparer ou préserver un instrument. Le visiteur doit pouvoir préparer sa demande de diagnostic. Les méthodes et les délais sont à confirmer.

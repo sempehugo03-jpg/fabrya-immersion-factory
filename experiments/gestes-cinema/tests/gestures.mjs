@@ -87,6 +87,15 @@ async function setup(browser, profile, viewport) {
   await page.goto(url);
   await page.locator('canvas:visible').waitFor();
   const readyMs = Math.round(performance.now() - started);
+  const bounds = await page.locator('canvas').evaluate(canvas => ({
+    left: canvas.getBoundingClientRect().left,
+    right: canvas.getBoundingClientRect().right,
+    viewport: document.documentElement.clientWidth,
+    pageWidth: document.documentElement.scrollWidth,
+  }));
+  assert.ok(bounds.left >= -1 && bounds.right <= bounds.viewport + 1,
+    `${profile}: canvas exceeds the visible horizontal bounds`);
+  assert.ok(bounds.pageWidth <= bounds.viewport + 1, `${profile}: page has horizontal overflow`);
   return {context,page,cdp:await context.newCDPSession(page),readyMs};
 }
 

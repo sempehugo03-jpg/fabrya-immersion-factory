@@ -1,0 +1,1 @@
+Sillage conserve des semences locales et aide les maraîchers à choisir des variétés pour leur terrain et leur calendrier. L'entreprise offre des conseils et des lots saisonniers. Préparer une demande de conseil est l'action principale. La disponibilité change selon la saison.
