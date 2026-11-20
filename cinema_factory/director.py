@@ -63,8 +63,14 @@ centre horizontal normalisé du sujet indispensable, half_width sa demi-largeur.
 que les hotspots doivent tenir dans le recadrage fixe mobile 4:5 (env. 45 % du master), avec une
 petite marge. Le visiteur peut s'arrêter partout. Favorise une découverte par un changement observable
 des relations, profondeur, matière ou point de vue. Un zoom sans information nouvelle est insuffisant.
-Direction structurée, sans texte visible inventé dans les images. Réponds en phrases courtes :
-une phrase de préférence par champ, environ 12 mots, sauf le prompt Runway si nécessaire.
+Direction structurée, sans texte visible inventé dans les images.
+Pour une séquence au scroll, fais d'abord exister un mouvement visible dans les images sources,
+et prévois le sens du mouvement, le point de vue et l'échelle de part et d'autre de chaque coupe.
+Imagine un geste propre au métier et garde les actions essentielles accessibles dès l'accueil.
+Une pose doit rester intelligible à l'arrêt et en sens inverse. Prévois la lecture du sujet dans le
+recadrage mobile. Le lecteur du site s'occupe du décodage et du chargement, donc ne demande pas
+d'effet de flou, de fondu ou de ralentissement pour cacher un raccord qui ne fonctionne pas.
+Réponds en phrases courtes : une phrase de préférence par champ, environ 12 mots, sauf le prompt Runway si nécessaire.
 Remets un résultat fini plutôt qu'une liste exhaustive. Pas de justification répétée.
 Pour une offre en images fixes, renseigne media au lieu de shots, avec le principe d'interaction.
 Pour une révision ciblée, conserve le projet, les concepts et les plans hors périmètre. Un montage

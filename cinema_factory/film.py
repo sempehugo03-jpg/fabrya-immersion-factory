@@ -15,6 +15,7 @@ from .contracts import Rejected
 from .runtime import digest, write_json
 
 FPS = 24
+FRAMES_PER_PACK = 24
 ROOT = Path(__file__).resolve().parents[1]
 PLAYER = ROOT / "experiments" / "gestes-cinema" / "web"
 HEIGHT = {"720p": 720, "1080p": 1080, "2160p": 2160}
@@ -121,24 +122,29 @@ def encode_packs(master, media, work, frames, height, width, crop, left):
                 break
         else:
             raise Rejected(f"{name}: frame pack exceeded {budget:,} bytes after compression")
-        destination = media / f"{name}.bin"
-        offsets = [0]
+        packs = []
         unique = set()
-        with destination.open("wb") as output:
-            for file in files:
-                data = file.read_bytes()
-                output.write(data)
-                offsets.append(offsets[-1] + len(data))
-                unique.add(sha256(data).digest())
+        total_bytes = 0
+        for first in range(0, frames, FRAMES_PER_PACK):
+            filename = f"{name}-{first // FRAMES_PER_PACK:03d}.webp"
+            offsets = [0]
+            with (media / filename).open("wb") as output:
+                for file in files[first:first + FRAMES_PER_PACK]:
+                    data = file.read_bytes()
+                    output.write(data)
+                    offsets.append(offsets[-1] + len(data))
+                    unique.add(sha256(data).digest())
+            packs.append(dict(url=f"media/{filename}", offsets=offsets))
+            total_bytes += offsets[-1]
         if len(unique) < frames * .4:
             raise Rejected(f"{name}: insufficient distinct decoded frames")
         shutil.copy2(files[0], media / f"{name}.webp")
         shutil.rmtree(directory)
         profiles[name] = dict(width=out_w, height=out_h, left=left / width if name == "mobile" else 0,
                               span=crop / width if name == "mobile" else 1,
-                              offsets=offsets, pack=f"media/{name}.bin")
+                              framesPerPack=FRAMES_PER_PACK, packs=packs)
         write_json(work / f"encoding-{name}.json", dict(
-            pack_bytes=offsets[-1], unique_frames=len(unique), quality=quality,
+            pack_bytes=total_bytes, packs=len(packs), unique_frames=len(unique), quality=quality,
         ))
     return profiles
 
@@ -199,7 +205,8 @@ def build_site(plan, sources, destinations, work):
     web = media.parent
     started = monotonic()
     profiles = encode_packs(master, media, work, report["frames"], height, width, crop, left)
-    shutil.copy2(PLAYER / "player.js", web / "player.js")
+    for script in ("player.js", "frame-loader.js"):
+        shutil.copy2(PLAYER / script, web / script)
     styles = (PLAYER / "style.css").read_text()
     (web / "style.css").write_text(styles + """
 .direct-actions{display:flex;gap:.5rem;flex-wrap:wrap;margin:0 0 .55rem}
@@ -210,7 +217,8 @@ def build_site(plan, sources, destinations, work):
     write_json(web / "track.json", dict(fps=FPS, frames=report["frames"],
                                        actions=actions, hotspots=hotspots, profiles=profiles))
     report.update(encode_seconds=round(monotonic() - started, 2), browser_bytes={
-        name: profile["offsets"][-1] for name, profile in profiles.items()
+        name: sum(pack["offsets"][-1] for pack in profile["packs"])
+        for name, profile in profiles.items()
     }, total_web_bytes=sum(file.stat().st_size for file in web.rglob("*") if file.is_file()))
     write_json(work / "film.json", report)
     return master, report

@@ -26,7 +26,7 @@ async function setup(browser, profile, viewport) {
   if (url === 'https://resonance.local/') {
     await context.route(url+'**', async route => {
       const resource = new URL(route.request().url()).pathname.slice(1) || 'index.html';
-      if (!/^(index\.html|style\.css|player\.js|track\.json|media\/(desktop|mobile)\.(webp|bin))$/.test(resource)) {
+      if (!/^(index\.html|style\.css|player\.js|frame-loader\.js|track\.json|media\/(desktop|mobile)(-\d{3})?\.(webp|bin))$/.test(resource)) {
         await route.fulfill({status:404});
         return;
       }
