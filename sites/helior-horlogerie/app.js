@@ -11,6 +11,7 @@ import { UnrealBloomPass } from './vendor/addons/postprocessing/UnrealBloomPass.
 import { OutputPass } from './vendor/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from './vendor/addons/postprocessing/ShaderPass.js';
 import { GTAOPass } from './vendor/addons/postprocessing/GTAOPass.js';
+import { FullScreenQuad } from './vendor/addons/postprocessing/Pass.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -217,6 +218,7 @@ function buildStage(renderer) {
   }
   scene.environment = pmrem.fromScene(studioEnvironment(), 0.015).texture;
   scene.environmentIntensity = 1.0;
+  let hdrEquirect = null;
   // a real photographed studio (CC0 HDRI) blended with the softboxes, loaded after first paint
   Promise.all([import('./vendor/studio-hdri.js'), import('./vendor/addons/loaders/EXRLoader.js')]).then(([hdri, { EXRLoader }]) => {
     const bin = atob(hdri.default.split(',')[1]);
@@ -229,7 +231,11 @@ function buildStage(renderer) {
     tex.minFilter = tex.magFilter = THREE.LinearFilter; tex.generateMipmaps = false; tex.flipY = false; tex.needsUpdate = true;
     const old = scene.environment;
     scene.environment = pmrem.fromScene(studioEnvironment(tex), 0.015).texture;
-    old.dispose(); tex.dispose();
+    old.dispose();
+    // same studio as a cube map for the path tracer, so the photo matches the live frame
+    const cubeRT = new THREE.WebGLCubeRenderTarget(512, { type: THREE.HalfFloatType });
+    new THREE.CubeCamera(0.1, 200, cubeRT).update(renderer, studioEnvironment(tex));
+    hdrEquirect = cubeRT.texture;
   }).catch(() => {});
   {
     const c = document.createElement('canvas'); c.width = 64; c.height = 1024;
@@ -464,14 +470,16 @@ function buildStage(renderer) {
     brushed: new THREE.MeshPhysicalMaterial({ color: 0xcdd2d8, metalness: 1, roughness: 0.32, anisotropy: 0.7 }),
     gold: new THREE.MeshPhysicalMaterial({ color: 0xe8c78c, metalness: 1, roughness: 0.2 }),
     gilt: new THREE.MeshPhysicalMaterial({ color: 0xd8b26a, metalness: 1, roughness: 0.3 }),
+    giltPolish: new THREE.MeshPhysicalMaterial({ color: 0xe9c88a, metalness: 1, roughness: 0.06 }),
+    polish: new THREE.MeshPhysicalMaterial({ color: 0xeef1f5, metalness: 1, roughness: 0.04 }),
     blued: new THREE.MeshPhysicalMaterial({ color: 0x2c55c4, metalness: 0.85, roughness: 0.22, clearcoat: 0.8, clearcoatRoughness: 0.1 }),
     ruby: new THREE.MeshPhysicalMaterial({ color: 0xb0102e, metalness: 0, roughness: 0.04, clearcoat: 1, emissive: 0x2a0008 }),
-    glass: new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 0, roughness: 0.0, transmission: 1, thickness: 1.4, ior: 1.77, specularIntensity: 0.4, attenuationColor: 0xe8f0ff, attenuationDistance: 40 }),
-    backGlass: new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 0, roughness: 0.02, transmission: 1, thickness: 0.5, ior: 1.77 }),
+    glass: new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 0, roughness: 0.0, transmission: 1, thickness: 0, ior: 1.77, specularIntensity: 0.4 }),
+    backGlass: new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 0, roughness: 0.02, transmission: 1, thickness: 0, ior: 1.77 }),
     bridge: new THREE.MeshPhysicalMaterial({ color: 0xffffff, map: cotesTex, bumpMap: cotesTex, bumpScale: 0.6, metalness: 1, roughness: 0.22, anisotropy: 0.6, anisotropyRotation: Math.PI / 2 - 0.62 }),
     plate: new THREE.MeshPhysicalMaterial({ color: 0xa7adb5, map: perlageTex, bumpMap: perlageTex, bumpScale: 0.5, metalness: 1, roughness: 0.3 }),
     ratchet: new THREE.MeshPhysicalMaterial({ color: 0xffffff, map: sunburstSteelTex, metalness: 1, roughness: 0.18 }),
-    leather: new THREE.MeshPhysicalMaterial({ color: 0x2a1910, bumpMap: grainTex, bumpScale: 2.5, roughnessMap: grainTex, roughness: 0.75, metalness: 0, sheen: 1, sheenColor: 0x6e4c34, sheenRoughness: 0.5, clearcoat: 0.15, side: THREE.DoubleSide }),
+    leather: new THREE.MeshPhysicalMaterial({ color: 0x2a1910, bumpMap: grainTex, bumpScale: 2.5, roughnessMap: grainTex, roughness: 0.75, metalness: 0, sheen: 0.45, sheenColor: 0x6e4c34, sheenRoughness: 0.5, clearcoat: 0.15, side: THREE.DoubleSide }),
     stitch: new THREE.MeshStandardMaterial({ color: 0xd8c7a4, roughness: 0.8 }),
     hair: new THREE.MeshPhysicalMaterial({ color: 0xa9bde2, metalness: 1, roughness: 0.2 }),
     dark: new THREE.MeshStandardMaterial({ color: 0x0a0d14, metalness: 0.2, roughness: 0.6 }),
@@ -660,8 +668,9 @@ function buildStage(renderer) {
     for (const flip of [0, Math.PI]) {
       const grp = new THREE.Group(); grp.rotation.z = flip; G.case.add(grp);
       mesh(strapGeo, M.leather, grp);
-      const st = new THREE.InstancedMesh(stitchGeo, M.stitch, STITCH);
       const dummy = new THREE.Object3D();
+      const sp = [], sn = [];
+      const base = stitchGeo.toNonIndexed();
       let k = 0;
       for (let i = 0; i < STITCH / 2; i++) {
         const tt = 0.04 + (i / (STITCH / 2)) * 0.9;
@@ -671,10 +680,15 @@ function buildStage(renderer) {
         for (const sx of [-1, 1]) {
           dummy.position.copy(p).addScaledVector(nrm, 0.86); dummy.position.x = sx * w;
           dummy.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), tan);
-          dummy.updateMatrix(); st.setMatrixAt(k++, dummy.matrix);
+          dummy.updateMatrix();
+          const g = base.clone().applyMatrix4(dummy.matrix);
+          sp.push(...g.attributes.position.array); sn.push(...g.attributes.normal.array); k++;
         }
       }
-      grp.add(st);
+      const sg = new THREE.BufferGeometry();
+      sg.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3));
+      sg.setAttribute('normal', new THREE.Float32BufferAttribute(sn, 3));
+      mesh(sg, M.stitch, grp);
     }
   }
   const crown = new THREE.Group();
@@ -720,7 +734,8 @@ function buildStage(renderer) {
   };
   const wheel = (shape, depth, mat, [x, y], z) => {
     const grp = new THREE.Group(); grp.position.set(x, y, z); G.train.add(grp);
-    mesh(ext(shape, depth, 0.05, 1, 24), mat, grp);
+    // faces keep their finish, flanks and chamfers are mirror-polished (anglage)
+    mesh(ext(shape, depth, 0.06, 3, 24), [mat, mat === M.gilt ? M.giltPolish : M.polish], grp);
     const pin = new THREE.CylinderGeometry(0.42, 0.42, 1.8, 20); pin.rotateX(Math.PI / 2);
     mesh(pin, M.steel, grp, 0, 0, 0.2);
     return grp;
@@ -772,7 +787,7 @@ function buildStage(renderer) {
 
   // --- bridges (Côtes de Genève) with jewels and blued screws
   const BZ = -1.0;
-  const bridge = (shape) => mesh(ext(shape, 0.75, 0.12, 2, 32), M.bridge, G.bridges, 0, 0, BZ);
+  const bridge = (shape) => mesh(ext(shape, 0.75, 0.16, 4, 48), [M.bridge, M.polish], G.bridges, 0, 0, BZ);
   bridge(polyShape([[1.4, 3.6], [5.4, 0.6], [12.0, 2.0], [14.3, 7.6], [10.6, 12.6], [4.2, 13.4], [0.6, 9.5]]));
   bridge(armShape([[12.4, 1.2], [P.third[0], P.third[1]], [P.fourth[0], P.fourth[1]], [P.escape[0], P.escape[1]], [-7.4, -13.4]], 1.25));
   bridge(armShape([[-16.0, -1.0], [-13.0, -2.6], [P.balance[0], P.balance[1]]], 1.15));
@@ -875,6 +890,7 @@ function buildStage(renderer) {
   function applyTrim(mat, key) { const t = TRIMS[key]; mat.color.setHex(t.color); mat.metalness = t.metalness; mat.roughness = t.roughness; mat.clearcoat = t.clearcoat; }
   function setDial(key) {
     if (!DIALS[key]) return;
+    if (typeof photo !== 'undefined') photo.lastMotion = performance.now();
     currentDial = key;
     const v = DIALS[key];
     dialTex.userData.redraw((ctx, s) => drawDial(ctx, s, v));
@@ -903,8 +919,8 @@ function buildStage(renderer) {
      e2: upper layers slid aside to reveal the movement. */
   const K = [
     { rot: [0.0, 0.0, 0.0], look: [0, 0, 0], dist: 158, d: [0.2, 0], m: [0, 0.21], e: 0, e2: 0, dof: 0.00002, fov: 17 },
-    { rot: [-0.32, -1.08, 0.08], look: [6, 0, 0], dist: 112, d: [0.21, 0], m: [0, 0.21], e: 0, e2: 0, dof: 0.0001, fov: 21 },
-    { rot: [-0.98, -0.6, 0.45], look: [0, 0, -1], dist: 250, d: [0.17, 0], m: [-0.04, 0.19], e: 1, e2: 0, dof: 0.00008, fov: 24 },
+    { rot: [-0.32, -1.08, 0.08], look: [6, 0, 0], dist: 112, d: [0.21, 0], m: [0, 0.21], e: 0, e2: 0, dof: 0.00004, fov: 21 },
+    { rot: [-0.98, -0.6, 0.45], look: [0, 0, -1], dist: 250, d: [0.17, 0], m: [-0.04, 0.19], e: 1, e2: 0, dof: 0.00003, fov: 24 },
     { rot: [-0.18, 0.22, 0.05], look: [-7.6, -6.4, -2], dist: 78, d: [0.21, 0], m: [0, 0.21], e: 1, e2: 1, dof: 0.00032, fov: 34 },
     { rot: [-0.62, 0.42, 0.3], look: [3, 1, -2], dist: 98, d: [0.25, 0], m: [0, 0.21], e: 0.3, e2: 1, dof: 0.00028, fov: 28 },
     { rot: [0.0, 0.0, 0.0], look: [0, 0, 0], dist: 150, d: [0.2, 0], m: [0, 0.21], e: 0, e2: 0, dof: 0.00002, fov: 17 },
@@ -912,10 +928,38 @@ function buildStage(renderer) {
   ];
 
   /* ---------------- shadows ---------------- */
+  // one material per mesh (the path tracer indexes materials per mesh): split multi-material
+  // extrusions into a mesh per group, and drop unused groups elsewhere
+  function subGeometry(geo, group) {
+    const g = new THREE.BufferGeometry();
+    if (geo.index) {
+      g.setIndex(new THREE.BufferAttribute(geo.index.array.slice(group.start, group.start + group.count), 1));
+      for (const k in geo.attributes) g.setAttribute(k, geo.attributes[k]);
+    } else {
+      for (const k in geo.attributes) {
+        const a = geo.attributes[k];
+        g.setAttribute(k, new THREE.BufferAttribute(a.array.slice(group.start * a.itemSize, (group.start + group.count) * a.itemSize), a.itemSize, a.normalized));
+      }
+    }
+    return g;
+  }
+  const multi = [];
+  watch.traverse((o) => {
+    if (!o.isMesh) return;
+    if (Array.isArray(o.material)) multi.push(o);
+    else if (o.geometry.groups.length) o.geometry.clearGroups();
+  });
+  for (const o of multi) {
+    const mats = o.material, geo = o.geometry;
+    geo.groups.forEach((grp, i) => {
+      const sub = subGeometry(geo, grp), mat = mats[grp.materialIndex || 0];
+      if (i === 0) { o.geometry = sub; o.material = mat; } else o.add(new THREE.Mesh(sub, mat));
+    });
+  }
   watch.traverse((o) => {
     if (!o.isMesh) return;
     const glassy = o.material === M.glass || o.material === M.backGlass;
-    o.castShadow = !glassy && !o.isInstancedMesh;
+    o.castShadow = !glassy;
     o.receiveShadow = !glassy;
   });
 
@@ -949,14 +993,18 @@ function buildStage(renderer) {
   composer.addPass(new OutputPass());
   // film grade: cool shadows, warm highlights, lens vignette, faint chromatic fringe, grain
   const grade = new ShaderPass({
-    uniforms: { tDiffuse: { value: null }, time: { value: 0 }, res: { value: new THREE.Vector2(1, 1) }, grain: { value: 0.035 }, vignette: { value: 0.32 }, ca: { value: 0.0025 } },
+    uniforms: { tDiffuse: { value: null }, time: { value: 0 }, res: { value: new THREE.Vector2(1, 1) }, grain: { value: 0.01 }, vignette: { value: 0.3 }, ca: { value: 0.0 }, sharp: { value: 0.35 } },
     vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-    fragmentShader: `uniform sampler2D tDiffuse; uniform float time, grain, vignette, ca; uniform vec2 res; varying vec2 vUv;
+    fragmentShader: `uniform sampler2D tDiffuse; uniform float time, grain, vignette, ca, sharp; uniform vec2 res; varying vec2 vUv;
       float rnd(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
       void main(){
         vec2 d = vUv - 0.5; float r2 = dot(d, d);
         vec2 off = d * ca * r2 * 4.0;
         vec3 c = vec3(texture2D(tDiffuse, vUv + off).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - off).b);
+        vec2 px = 1.0 / res;
+        vec3 nb = texture2D(tDiffuse, vUv + vec2(px.x, 0.0)).rgb + texture2D(tDiffuse, vUv - vec2(px.x, 0.0)).rgb
+                + texture2D(tDiffuse, vUv + vec2(0.0, px.y)).rgb + texture2D(tDiffuse, vUv - vec2(0.0, px.y)).rgb;
+        c = max(c + sharp * (c - nb * 0.25), 0.0);
         float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
         c += vec3(-0.012, 0.0, 0.022) * (1.0 - smoothstep(0.0, 0.45, l));
         c += vec3(0.022, 0.01, -0.014) * smoothstep(0.55, 1.0, l);
@@ -977,7 +1025,64 @@ function buildStage(renderer) {
     { pr: 2, ao: true, dof: true, bloom: true, shadow: 3072 },
   ];
   let tier = forceHQ ? 3 : mobileMQ.matches ? 1 : 2;
-  if (forceHQ) window.__helior = { gtao, bokeh, bloom, grade, M, G };
+  if (forceHQ) window.__helior = { gtao, bokeh, bloom, grade, M, G, photo: () => photo };
+
+  /* ---------------- photo mode: progressive path tracing when the visitor pauses ----------------
+     While scrolling, the rasterised frame keeps 60 fps. As soon as the image is still, a path
+     tracer (exact reflections, sapphire refraction, soft shadows) refines it at up to twice the
+     screen resolution and fades in over the live frame. Any input hands back to the live render. */
+  const photoStatus = $('#photo-status');
+  const photo = { pt: null, active: false, loading: false, failed: mobileMQ.matches || /nophoto/.test(location.search), alpha: 0, lastMotion: 0 };
+  const photoMat = new THREE.ShaderMaterial({
+    uniforms: { map: { value: null }, opacity: { value: 0 }, vignette: { value: 0.3 } },
+    vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+    fragmentShader: `uniform sampler2D map; uniform float opacity, vignette; varying vec2 vUv;
+      void main(){
+        vec4 c = texture2D(map, vUv);
+        vec2 d = vUv - 0.5; float r2 = dot(d, d);
+        c.rgb *= 1.0 - vignette * smoothstep(0.12, 0.62, r2 * 1.5);
+        gl_FragColor = vec4(c.rgb * opacity, c.a * opacity);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }`,
+    transparent: true, premultipliedAlpha: true, depthTest: false, depthWrite: false, toneMapped: true,
+  });
+  const photoQuad = new FullScreenQuad(photoMat);
+  const bgScene = new THREE.Scene(); bgScene.background = scene.background;
+
+  async function loadPhoto() {
+    photo.loading = true;
+    try {
+      const { WebGLPathTracer } = await import('./vendor/pathtracer.js');
+      const pt = new WebGLPathTracer(renderer);
+      pt.renderToCanvas = false; pt.rasterizeScene = false;
+      pt.tiles.set(2, 2); pt.bounces = 7; pt.filteredGlossyFactor = 0.4;
+      pt.minSamples = 1; pt.renderDelay = 0; pt.fadeDuration = 0;
+      pt.textureSize.set(2048, 2048);
+      photo.pt = pt;
+    } catch (err) { photo.failed = true; console.warn('photo mode unavailable', err); }
+    photo.loading = false;
+  }
+  function enterPhoto() {
+    if (photo.failed || !hdrEquirect) return;
+    if (!photo.pt) { if (!photo.loading) loadPhoto(); return; }
+    const env = scene.environment, bg = scene.background;
+    try {
+      photo.pt.renderScale = Math.min(2, 2.0 / prNow);
+      scene.environment = hdrEquirect; scene.background = null;
+      watch.updateMatrixWorld(true);
+      photo.pt.setScene(scene, camera);
+      photo.active = true; photo.alpha = 0;
+    } catch (err) {
+      photo.failed = true; console.warn('photo mode failed', err);
+    } finally {
+      scene.environment = env; scene.background = bg;
+    }
+  }
+  function exitPhoto() {
+    photo.active = false; photo.alpha = 0;
+    if (photoStatus) photoStatus.hidden = true;
+  }
   let prNow = 1, upgraded = false;
   function applyTier() {
     const q = TIERS[tier];
@@ -1020,7 +1125,7 @@ function buildStage(renderer) {
 
   let smoothT = scrollT(), velT = 0;
   let simTime = 0, lastBeat = 0;
-  let introStart = -1, perfN = 0, perfSum = 0;
+  let introStart = -1, perfN = 0, perfSum = 0, clock = 0;
   let last = performance.now();
   let first = true;
 
@@ -1033,7 +1138,7 @@ function buildStage(renderer) {
     stepWheel(dt);
 
     // adaptive quality, measured once the intro has settled
-    if (!forceHQ && introStart >= 0 && now - introStart > 3500 && rawDt < 0.5) {
+    if (!forceHQ && !photo.active && introStart >= 0 && now - introStart > 3500 && rawDt < 0.5) {
       perfSum += rawDt; perfN++;
       if (perfN === 90) {
         const avg = perfSum / perfN;
@@ -1051,6 +1156,7 @@ function buildStage(renderer) {
       if (Math.abs(target - smoothT) < 1e-4 && Math.abs(velT) < 1e-3) { smoothT = target; velT = 0; }
     }
     if (introStart < 0) introStart = now;
+    if (!photo.active) clock += dt * 1000;
     const intro = reduce ? 1 : smoothstep(0, 1, clamp((now - introStart) / 3200));
     const t = smoothT;
     updateChrome(t);
@@ -1064,7 +1170,7 @@ function buildStage(renderer) {
 
     smx += (mx - smx) * (1 - Math.exp(-dt * 3));
     smy += (my - smy) * (1 - Math.exp(-dt * 3));
-    const idle = reduce ? 0 : Math.sin(now * 0.00035) * 0.035 - (1 - intro) * 0.55;
+    const idle = reduce ? 0 : Math.sin(clock * 0.00035) * 0.035 - (1 - intro) * 0.55;
     const par = reduce ? 0 : 1;
     watch.rotation.set(
       lerp(a.rot[0], b.rot[0], f) + smy * 0.09 * par,
@@ -1099,8 +1205,8 @@ function buildStage(renderer) {
     if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
     const hand = reduce ? 0 : dist * 0.0012;
     camera.position.set(
-      lookV.x + Math.sin(now * 0.00041) * hand,
-      lookV.y + Math.sin(now * 0.00029 + 1.3) * hand,
+      lookV.x + Math.sin(clock * 0.00041) * hand,
+      lookV.y + Math.sin(clock * 0.00029 + 1.3) * hand,
       lookV.z + dist,
     );
     camera.lookAt(lookV);
@@ -1126,7 +1232,7 @@ function buildStage(renderer) {
     // movement: time slows down in the heart chapter
     const heart = 1 - clamp(Math.abs(t - 3) * 1.4);
     const rate = reduce ? 0 : lerp(1, 0.25, smoothstep(0, 1, heart));
-    simTime += dt * rate;
+    if (!photo.active) simTime += dt * rate;
     const phase = TAU * 4 * simTime;
     balance.rotation.z = 4.0 * Math.sin(phase);
     hairspring.rotation.z = 1.6 * Math.sin(phase);
@@ -1164,8 +1270,38 @@ function buildStage(renderer) {
 
     bokeh.uniforms.focus.value = dist;
     bokeh.uniforms.aperture.value = lerp(a.dof, b.dof, f) * (mobile ? 0.6 : 1);
+    // photo mode trigger: everything still for 0.7 s, outside the beating-heart close-up
+    const motion = Math.abs(target - smoothT) + Math.abs(velT) * 0.2 + (wheelActive ? 1 : 0) + Math.abs(mx - smx) + Math.abs(my - smy);
+    if (motion > 0.0015 || intro < 1 || heart > 0.2 || reduce) photo.lastMotion = now;
+    const wantPhoto = !photo.failed && now - photo.lastMotion > 700;
+    if (photo.active && !wantPhoto) exitPhoto();
+    else if (!photo.active && wantPhoto) enterPhoto();
+
     grade.uniforms.time.value = now * 0.001;
-    composer.render(dt);
+    if (photo.active && photo.alpha >= 1) {
+      renderer.setRenderTarget(null);
+      renderer.render(bgScene, camera);
+    } else {
+      composer.render(dt);
+    }
+    if (photo.active) {
+      const pt = photo.pt;
+      if (pt.samples < 384) pt.renderSample();
+      if (pt.samples >= 2) {
+        photo.alpha = Math.min(1, photo.alpha + dt * 1.6);
+        photoMat.uniforms.map.value = pt.target.texture;
+        photoMat.uniforms.opacity.value = photo.alpha;
+        const ac = renderer.autoClear; renderer.autoClear = false;
+        renderer.setRenderTarget(null);
+        photoQuad.render(renderer);
+        renderer.autoClear = ac;
+      }
+      if (photoStatus) {
+        photoStatus.hidden = false;
+        const n = Math.floor(pt.samples);
+        photoStatus.textContent = n >= 384 ? 'Rendu photo · net' : `Rendu photo · ${n} passes`;
+      }
+    }
     if (first) { first = false; loader.classList.add('done'); }
   }
   requestAnimationFrame(frame);

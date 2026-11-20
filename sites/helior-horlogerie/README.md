@@ -22,6 +22,10 @@ relief perlage / Côtes de Genève, ombres douces, occlusion ambiante (GTAO), gl
 profondeur de champ, bloom, étalonnage (grain, vignettage, frange chromatique). Qualité adaptative : la résolution et les
 effets baissent automatiquement si la machine ne tient pas ~45 i/s ; `?hq` force la qualité maximale.
 
+Mode photo : dès que l'image est immobile (0,7 s), un moteur de lancer de rayons (three-gpu-pathtracer, MIT)
+recalcule la scène à 2× la résolution de l'écran — reflets exacts, réfraction du saphir, ombres douces — et se fond
+sur l'image en direct. Toute interaction rend la main au rendu temps réel. Désactivé sur mobile ; `?nophoto` le coupe.
+
 Mouvement : défilement inertiel à la molette, ressort amorti sur la timeline, intro avec balayage de lumière, caméra « à l'épaule ».
 
 Détails : petite seconde qui avance par huitièmes (28 800 alt/h), son d'échappement optionnel (bouton « Battement »),

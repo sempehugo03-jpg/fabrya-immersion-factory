@@ -148,6 +148,18 @@ a { color: inherit; }
 }
 .reserve-label b { color: var(--ink); font-weight: 500; font-size: 11px; font-variant-numeric: tabular-nums; letter-spacing: 0.05em; }
 
+.photo-status {
+  position: fixed; z-index: 20; margin: 0;
+  left: calc(24px + env(safe-area-inset-left, 0px));
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--f-mono); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted);
+}
+.photo-status::before {
+  content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--gold);
+  box-shadow: 0 0 10px var(--gold);
+}
+
 /* ---------- chapters ---------- */
 main { position: relative; z-index: 10; }
 .chapter {
