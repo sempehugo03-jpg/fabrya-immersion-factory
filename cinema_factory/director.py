@@ -66,7 +66,11 @@ des relations, profondeur, matière ou point de vue. Un zoom sans information no
 Direction structurée, sans texte visible inventé dans les images.
 Pour une séquence au scroll, fais d'abord exister un mouvement visible dans les images sources,
 et prévois le sens du mouvement, le point de vue et l'échelle de part et d'autre de chaque coupe.
-Imagine un geste propre au métier et garde les actions essentielles accessibles dès l'accueil.
+Imagine un geste propre au métier ou une découverte adaptée au lieu, à la matière ou au service.
+Identifie l'action, le sujet et le changement que le visiteur observe. Compare un plan qui suit
+le sujet à un point de vue fixe lorsque le sujet se transforme déjà. Pour un assemblage dont
+la géométrie doit rester exacte, choisis des sources vérifiées ou signale le besoin d'un rendu 3D
+hors des routes disponibles. Garde les actions essentielles accessibles dès l'accueil.
 Une pose doit rester intelligible à l'arrêt et en sens inverse. Prévois la lecture du sujet dans le
 recadrage mobile. Le lecteur du site s'occupe du décodage et du chargement, donc ne demande pas
 d'effet de flou, de fondu ou de ralentissement pour cacher un raccord qui ne fonctionne pas.

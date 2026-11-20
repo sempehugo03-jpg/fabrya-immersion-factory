@@ -34,7 +34,7 @@ async function setup(browser, profile, viewport) {
     });
   }
   await context.addInitScript(() => {
-    const log = window.filmTest = { targets:[], presentations:[], inputs:[], phase:'DÉPART' };
+    const log = window.filmTest = { targets:[], presentations:[], inputs:[], samples:[], phase:'DÉPART' };
     let input;
     function updateBanner() {
       const ui = document.querySelector('#test-banner');
@@ -79,6 +79,26 @@ async function setup(browser, profile, viewport) {
         log.presentations.push({ ...detail, phase:log.phase });
         updateBanner();
       });
+      let lastTarget;
+      let lastPresentation;
+      function sample(moment) {
+        const target = log.targets.at(-1);
+        const presented = Number(stage.dataset.presented);
+        if (target?.phase === log.phase && moment - target.requested <= 300
+            && Number.isFinite(presented) && target.input) {
+          log.samples.push({
+            phase: log.phase, target: target.index, presented, moment,
+            repeatedWhileBehind: lastPresentation === presented && target.index !== presented
+              && (target.index !== lastTarget || log.samples.at(-1)?.repeatedWhileBehind === true),
+          });
+          lastTarget = target.index;
+          lastPresentation = presented;
+        } else {
+          lastTarget = lastPresentation = undefined;
+        }
+        requestAnimationFrame(sample);
+      }
+      requestAnimationFrame(sample);
       updateBanner();
     });
   });
@@ -178,7 +198,24 @@ function summarize(log) {
   const latencies=successes.map(e=>done.get(key(e)).moment-e.input.when);
   const lookups=successes.map(e=>done.get(key(e)).moment-e.requested);
   const gaps=targets.reduce((total,e,i)=>total+(i && e.phase===targets[i-1].phase ? Math.max(0,Math.abs(e.index-targets[i-1].index)-1):0),0);
+  const gesturePhases = new Set(targets.map(event => event.phase));
+  const byPhase = Object.fromEntries([...gesturePhases].map(phase => {
+    const samples = log.samples.filter(sample => sample.phase === phase);
+    const deltas = samples.slice(1).map((sample, index) => Math.abs(sample.presented - samples[index].presented));
+    const finalTarget = targets.findLast(event => event.phase === phase);
+    const finalDraw = done.get(key(finalTarget));
+    const finalGesture = log.inputs.findLast(event => event.phase === phase);
+    return [phase, {
+      sampledRefreshes: samples.length,
+      repeatedWhileBehind: samples.filter(sample => sample.repeatedWhileBehind).length,
+      targetErrorP95Frames: percentile(samples.map(sample => Math.abs(sample.target - sample.presented)), .95),
+      largestPresentedJumpFrames: percentile(deltas, 1),
+      lastGestureToFinalDrawMs: finalDraw && finalGesture
+        ? Math.max(0, +(finalDraw.moment - finalGesture.when).toFixed(1)) : null,
+    }];
+  }));
   return {
+    byPhase,
     trustedGestures:log.inputs.length,
     requestedWithRecentInput:targets.length,
     drawnForThoseRequests:successes.length,
