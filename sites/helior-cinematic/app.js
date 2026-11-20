@@ -6,6 +6,7 @@
 import { createBoxCinema } from './box-cinema.js?v=gesture-final';
 import { chapterPosition, filmPosition } from './motion-timeline.js?v=3';
 import { createNumberedCinema } from './numbered-cinema.js?v=3';
+import { createFilmPlayer } from './film-player.js?v=smooth1';
 import * as THREE from './vendor/three.module.min.js';
 import { EffectComposer } from './vendor/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from './vendor/addons/postprocessing/RenderPass.js';
@@ -57,7 +58,7 @@ if (document.fonts) document.fonts.ready.then(measure);
 
 /* ---------- inertial wheel scrolling: the page glides like a crown under the thumb ---------- */
 let wheelTarget = scrollY, wheelActive = false;
-if (!cinemaMode) addEventListener('wheel', (e) => {
+addEventListener('wheel', (e) => {
   if (reduceMQ.matches || e.ctrlKey || mobileMQ.matches) return;
   e.preventDefault();
   const unit = e.deltaMode === 1 ? 32 : e.deltaMode === 2 ? innerHeight : 1;
@@ -173,10 +174,15 @@ function tick(tac) {
    ========================================================================= */
 const cinemaStage = $('#box-cinema');
 const mobileCinema = cinemaMode && mobileMQ.matches;
+// The pack player streams all-intra 60 fps frames and scrubs them smoothly in both directions.
+// The previous players stay as fallbacks only (?player=legacy).
+const legacyPlayer = query.get('player') === 'legacy';
 const boxCinema = cinemaMode
-  ? (mobileCinema ? createNumberedCinema(cinemaStage, t => filmPosition(t, reduceMQ.matches)) : null) ??
+  ? (!legacyPlayer ? createFilmPlayer(cinemaStage, { mobile: mobileCinema, reducedMotion: reduceMQ }) : null) ??
+    (mobileCinema ? createNumberedCinema(cinemaStage, t => filmPosition(t, reduceMQ.matches)) : null) ??
     createBoxCinema(cinemaStage, mobileCinema, reduceMQ, { dense: !mobileCinema })
   : null;
+if (query.has('measure')) window.__film = boxCinema;
 boxCinema?.update(scrollT());
 const canvas = $('#scene');
 const loader = $('.loader');
