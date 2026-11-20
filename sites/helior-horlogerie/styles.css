@@ -321,3 +321,6 @@ input[aria-invalid="true"] { border-bottom-color: #e08a7a; }
   .hint-crown, .sound[aria-pressed="true"] i { animation: none; }
   .chapters a span { transition: none; }
 }
+
+/* reference plates for the image-generation pipeline (?plate): the watch alone */
+.plate .top, .plate .chapters, .plate .reserve, .plate .veil, .plate main, .plate .foot, .plate .tags, .plate .photo-status, .plate .loader { visibility: hidden !important; }

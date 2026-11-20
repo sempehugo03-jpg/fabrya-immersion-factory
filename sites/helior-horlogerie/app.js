@@ -1018,6 +1018,7 @@ function buildStage(renderer) {
 
   /* ---------------- adaptive quality: keep it fluid on every machine ---------------- */
   const forceHQ = /hq/.test(location.search) || location.hash === '#hq';
+  if (/plate/.test(location.search)) document.documentElement.classList.add('plate');
   const TIERS = [
     { pr: 0.75, ao: false, dof: false, bloom: false, shadow: 1024 },
     { pr: 1, ao: false, dof: true, bloom: true, shadow: 2048 },
@@ -1212,7 +1213,8 @@ function buildStage(renderer) {
     camera.lookAt(lookV);
     key.intensity = 2.6 * (0.25 + 0.75 * intro);
     scene.environmentIntensity = 0.35 + 0.65 * intro;
-    const sx = lerp(a[L][0], b[L][0], f), sy = lerp(a[L][1], b[L][1], f);
+    const plate = /plate/.test(location.search); // clean centred plates used as references for image generation
+    const sx = plate ? 0 : lerp(a[L][0], b[L][0], f), sy = plate ? 0 : lerp(a[L][1], b[L][1], f);
     camera.setViewOffset(W, H, -sx * W, sy * H, W, H);
 
     // time: the crown sets the hands forward as you scroll, then they return to the exact hour
