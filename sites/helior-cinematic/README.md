@@ -16,7 +16,7 @@ avec un nouveau lecteur de film pour un défilement fluide dans les deux sens, l
 
 ## Médias
 
-- `media/film/desktop/packs/` : 76,5 Mo, extraits une image sur trois du flux 180 i/s d'origine (1440×1440).
+- `media/film/desktop/packs/` (paquets `pack-NN.webp`) : 76,5 Mo, extraits une image sur trois du flux 180 i/s d'origine (1440×1440).
 - `media/film/mobile/packs/` : 42,3 Mo, depuis `frames-60` d'origine (900×900).
 - Les téléphones ne téléchargent que la version 900 px. En mode économie de données (2G/3G), seul le voisinage de la position est chargé.
 

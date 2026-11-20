@@ -80,7 +80,7 @@ export function createFilmPlayer(stage, { mobile = false, reducedMotion, timelin
   // ---------- loading ----------
   function loadPack(index) {
     fetching.add(index);
-    fetch(new URL(`${String(index).padStart(2, '0')}.bin`, base)).then(r => {
+    fetch(new URL(`pack-${String(index).padStart(2, '0')}.webp`, base)).then(r => {
       if (!r.ok) throw new Error(String(r.status));
       return r.arrayBuffer();
     }).then(buffer => {
